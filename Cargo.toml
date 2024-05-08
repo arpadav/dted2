@@ -1,0 +1,17 @@
+[package]
+name = "dted2"
+version = "0.1.0"
+authors = ["Arpad Voros <arpadav@gmail.com>"]
+license = "MIT"
+description = "Tool for reading DTED files"
+repository = "https://github.com/arpadav/dted2"
+documentation = "https://docs.rs/dted2"
+readme = "README.md"
+keywords = ["parser", "dted", "gis", "geo"]
+categories = ["parser-implementations", "data-structures", "development-tools", "rendering"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7"
