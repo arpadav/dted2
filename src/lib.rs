@@ -95,6 +95,25 @@ struct Axis {
     interval: f64,
 }
 
+// /// An axis within a defined grid (either latitude or longitude)
+// /// 
+// /// * `min` (f64): grid axis minimum value
+// /// * `max` (f64): grid axis maximum value
+// /// * `interval` (f64): grid axis interval (in meters)
+// struct Axis {
+//     min: AxisElement<f64>,
+//     max: AxisElement<f64>,
+//     interval: AxisElement<f64>,
+// }
+
+/// An axis element
+/// 
+/// 
+struct AxisElement<T> {
+    lat: T,
+    lon: T,
+}
+
 /// DTED User Header Label (UHL)
 /// 
 /// See: https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf 
@@ -109,11 +128,14 @@ struct Axis {
 /// * `lon_count` (u16): number of longitude lines
 /// * `lat_count` (u16): number of latitude points per longitude line
 pub struct DTEDHeader {
+    // pub origin: AxisElement<Angle>,
     pub lon_origin: Angle,
     pub lat_origin: Angle,
+    // pub interval_s: AxisElement<u16>,
     pub lon_interval_s: u16,
     pub lat_interval_s: u16,
     pub accuracy: Option<u16>,
+    // pub count: AxisElement<u16>,
     pub lon_count: u16,
     pub lat_count: u16,
 }

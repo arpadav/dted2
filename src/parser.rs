@@ -15,20 +15,26 @@ use std::{
     },
 };
 use nom::{
-    branch::alt, bytes::{
-        complete::{
-            tag,
-            take,
-        },
-        streaming::take_while_m_n,
-    }, combinator::{
+    IResult,
+    branch::alt,
+    multi::count,
+    sequence::{
+        tuple,
+        preceded, 
+    },
+    combinator::{
+        opt,
         map,
-        map_res, opt,
-    }, multi::count, number::complete::{
-        be_i16, be_u16
-    }, sequence::{
-        preceded, tuple
-    }, IResult
+        map_res,
+    },
+    bytes::complete::{
+        tag,
+        take,
+    }, 
+    number::complete::{
+        be_u16,
+        be_i16,
+    },
 };
 
 // --------------------------------------------------
@@ -69,18 +75,14 @@ enum Tags {
 
 #[derive(Debug)]
 pub enum Error {
-    // #[fail(display = "IO error: {}", _0)]
     Io(io::Error),
-    // #[fail(display = "Parse error: {}", _0)]
     ParseError(String),
 }
-
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::Io(err)
     }
 }
-
 impl<I: Debug> From<nom::Err<I>> for Error {
     fn from(err: nom::Err<I>) -> Error {
         Error::ParseError(format!("{}", err))
@@ -151,9 +153,17 @@ fn parse_dted_file(input: &[u8]) -> IResult<&[u8], DTEDFile> {
 // Parse the DTED header
 fn parse_dted_header(input: &[u8]) -> IResult<&[u8], DTEDHeader> {
     let (input, _) = tag(b"UHL1")(input)?;
-    let (input,
-        (lon_origin, lat_origin, lon_interval_s, lat_interval_s, accuracy, _, lon_count, lat_count, _))
-    = tuple((
+    let (input, (
+        lon_origin,
+        lat_origin,
+        lon_interval_s,
+        lat_interval_s,
+        accuracy,
+        _,
+        lon_count,
+        lat_count,
+        _,
+    )) = tuple((
         parse_angle,
         parse_angle,
         parse_u16_4char,
@@ -184,36 +194,59 @@ fn parse_dted_header(input: &[u8]) -> IResult<&[u8], DTEDHeader> {
 }
 
 // Parse angle from bytes
-fn parse_angle(input: &[u8], dmsh: String) -> IResult<&[u8], Angle> {
-    let dmsh_u8_slice: &[u8] = dmsh.as_bytes();
-
-    let (dmsh_u8_slice,
-        (num_deg, num_min, num_sec, sign))
-    = tuple((
-        map(take_while_m_n(0, 16, |c| c == b'D'), |x: &[u8]| x.len()),
-        map(take_while_m_n(0, 16, |c| c == b'M'), |x: &[u8]| x.len()),
-        map(take_while_m_n(0, 16, |c| c == b'S'), |x: &[u8]| x.len()),
-        opt(tag("H")),
-        // take_while_m_n(0, 16, tag("D")),
-    ))(dmsh_u8_slice)?;
-    let (input,
-        (deg, min, sec, sign))
-    = tuple((
-        map(take(3_usize), u32_parser),
-        map(take(2_usize), u32_parser),
-        map(take(2_usize), u32_parser),
-        alt((
+fn parse_angle(
+    input: &[u8],
+    num_deg: usize,
+    num_min: usize,
+    num_sec: usize,
+    sign: bool,
+) -> IResult<&[u8], Angle> {
+    // let (input, (
+    //     deg,
+    //     min,
+    //     sec,
+    //     sign,
+    // )) = tuple((
+    //     map(take(3_usize), u32_parser),
+    //     map(take(2_usize), u32_parser),
+    //     map(take(2_usize), u32_parser),
+    //     alt((
+    //         map(tag("N"), |_| 1i16),
+    //         map(tag("S"), |_| -1i16),
+    //         map(tag("E"), |_| 1i16),
+    //         map(tag("W"), |_| -1i16)
+    //     ))
+    // ))(input)?;
+    let (input, (
+        deg,
+        min,
+        sec,
+        sign,
+    )) = tuple((
+        || if num_deg == 0 { 0u32 } else { map(take(num_deg), u32_parser) },
+        || if num_min == 0 { 0u32 } else { map(take(num_min), u32_parser) },
+        || if num_sec == 0 { 0u32 } else { map(take(num_sec), u32_parser) },
+        opt(alt((
             map(tag("N"), |_| 1i16),
             map(tag("S"), |_| -1i16),
             map(tag("E"), |_| 1i16),
-            map(tag("W"), |_| -1i16)
-        ))
+            map(tag("W"), |_| -1i16),
+        )))
     ))(input)?;
     Ok((input, Angle {
-        deg: (deg as i16) * sign,
+        deg: (deg as i16) * sign.unwrap_or(1i16),
         min: min as u8,
         sec: sec as u8
     }))
+}
+
+fn dted_angle_parser(
+    num_deg: usize,
+    num_min: usize,
+    num_sec: usize,
+    sign: bool,
+) -> impl Fn(&[u8]) -> IResult<&[u8], Angle> {
+    move |input| parse_angle(input, num_deg, num_min, num_sec, sign)
 }
 
 // Parse 4-character u16
