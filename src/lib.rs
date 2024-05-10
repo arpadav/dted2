@@ -9,7 +9,10 @@ use std::io;
 pub mod dted;
 pub mod parsers;
 pub mod primitives;
-pub use dted::DTEDData;
+pub use dted::{
+    DTEDData,
+    DTEDMetadata,
+};
 
 #[derive(Debug)]
 /// DTED parsing error
