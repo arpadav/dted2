@@ -1,6 +1,6 @@
 [package]
 name = "dted2"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Arpad Voros <arpadav@gmail.com>"]
 license = "MIT"
 description = "Tool for reading DTED files"
