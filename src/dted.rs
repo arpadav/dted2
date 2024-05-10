@@ -9,6 +9,7 @@ use std::io::Read;
 use crate::parsers;
 use crate::Error as DTEDError;
 use crate::primitives::{
+    self,
     Angle,
     AxisElement,
 };
@@ -30,10 +31,11 @@ pub const DT2_ACC_RECORD_LENGTH: usize = 2700;
 /// 
 /// # Branches
 /// 
-/// * `UHL` - User Header Label
-/// * `DSI` - Data Set Identification
-/// * `ACC` - Accuracy Description
-/// * `DataRecord` - Data Record
+/// * [RecognitionSentinel::UHL] - User Header Label
+/// * [RecognitionSentinel::DSI] - Data Set Identification
+/// * [RecognitionSentinel::ACC] - Accuracy Description
+/// * [RecognitionSentinel::DATA] - Data Record
+/// * [RecognitionSentinel::NA] - Not Available
 /// 
 /// # Examples
 /// 
@@ -74,26 +76,222 @@ impl RecognitionSentinel {
     }
 }
 
+#[derive(Debug)]
 /// DTED User Header Label (UHL)
 /// 
 /// See: https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf 
 /// 
-/// * `lon_origin` (dted2::Angle): longitude of the lower left corner of the grid
-/// * `lat_origin` (dted2::Angle): latitude of the lower left corner of the grid
-/// * `lon_interval_s` (u16): longitude data interval in seconds
-/// * `lat_interval_s` (u16): latitude data interval in seconds
-/// * `accuracy` (Option<u16>): Absolute Vertical Accuracy in meters (90% assurance that)
-///   the linear errors will not exceed this value relative to mean sea level (right
-///   justified)
-/// * `lon_count` (u16): number of longitude lines
-/// * `lat_count` (u16): number of latitude points per longitude line
+/// # Fields
+/// 
+/// * `origin` [AxisElement<Angle>]: latitude and longitude of the lower left corner of the grid
+/// * `interval_secs_x_10` [AxisElement<u16>]: data interval in seconds (decimal point is implied after third integer)
+/// * `accuracy` [Option<u16>] - absolute vertical accuracy in meters (with 90%
+///   assurance that the linear errors will not exceed this value relative to
+///   mean sea level)
+/// * `count` [AxisElement<u16>] - number of longitude lines and latitude points
 pub struct RawDTEDHeader {
     pub origin: AxisElement<Angle>,
-    pub interval_s: AxisElement<u16>,
+    pub interval_secs_x_10: AxisElement<u16>,
     pub accuracy: Option<u16>,
     pub count: AxisElement<u16>,
 }
 
+#[derive(Clone)]
+/// DTED metadata
+/// 
+/// # Fields
+/// 
+/// * `filename` [String] - filename
+/// * `origin` [AxisElement<f64>] - position of the lower left corner of the grid (floating point precision)
+/// * `origin_angle` [AxisElement<Angle>] - position of the lower left corner of the grid
+/// * `interval` [AxisElement<f64>] - interval (floating point precision)
+/// * `interval_secs` [AxisElement<f32>] - interval (as seconds of an [Angle])
+/// * `accuracy` [Option<u16>] - absolute vertical accuracy in meters (with 90%
+///   assurance that the linear errors will not exceed this value relative to
+///   mean sea level)
+/// * `count` [AxisElement<u16>] - number of longitude lines and latitude points
+pub struct DTEDMetadata {
+    pub filename: String,
+    pub origin: AxisElement<f64>,
+    pub origin_angle: AxisElement<Angle>,
+    pub interval: AxisElement<f64>,
+    pub interval_secs: AxisElement<f32>,
+    pub accuracy: Option<u16>,
+    pub count: AxisElement<u16>,
+}
+impl DTEDMetadata {
+    /// Create a [DTEDMetadata] from a [RawDTEDHeader]
+    /// 
+    /// # Arguments
+    /// 
+    /// * `raw` - [RawDTEDHeader]
+    /// * `fname` - filename
+    /// 
+    /// # Returns
+    /// 
+    /// * [DTEDMetadata]: DTED metadata
+    pub fn from_header(raw: &RawDTEDHeader, fname: &str) -> DTEDMetadata {
+        DTEDMetadata {
+            filename: fname.to_string(),
+            origin: raw.origin.into(),
+            origin_angle: raw.origin.into(),
+            interval: raw.interval_secs_x_10 / (primitives::SEC2DEG * 10.0),
+            interval_secs: raw.interval_secs_x_10 / 10.0,
+            accuracy: raw.accuracy,
+            count: raw.count,
+        }
+    }
+}
+
+/// DTED Data
+/// 
+/// This is the main entry point for reading DTED files.
+/// Usage consists of either [DTEDData::read] or [DTEDData::read_header]
+/// 
+/// # Fields
+/// 
+/// * `metadata` - [DTEDMetadata]
+/// * `min` - minimum lat/lon
+/// * `max` - maximum lat/lon
+/// * `data` - data
+pub struct DTEDData {
+    pub metadata: DTEDMetadata,
+    pub min: AxisElement<f64>,
+    pub max: AxisElement<f64>,
+    pub data: Vec<RawDTEDRecord>,
+}
+impl DTEDData {
+    /// Read a DTED file
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` (str): Path to the DTED file
+    /// 
+    /// # Returns
+    /// 
+    /// * [DTEDData]: DTED data
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use dted2::DTEDData;
+    /// assert!(DTEDData::read("tests/test_data.dt2").is_ok());
+    /// ```
+    pub fn read(path: &str) -> Result<DTEDData, DTEDError> {
+        let mut file = std::fs::File::open(path)?;
+        let mut content = Vec::new();
+        file.read_to_end(&mut content)?;
+        match parsers::dted_file_parser(&content) {
+            Ok((_, data)) => {
+                let metadata = DTEDMetadata::from_header(&data.header, path);
+                let interval = metadata.interval;
+                let origin_f64: AxisElement<f64> = data.header.origin.into();
+                Ok(DTEDData {
+                    metadata: metadata,
+                    min: origin_f64.clone(),
+                    max: origin_f64 + ((data.header.count - 1) * interval),
+                    data: data.data
+                })
+            },
+            Err(e) => match e {
+                nom::Err::Incomplete(e) => Err(e.into()),
+                nom::Err::Error(e) | nom::Err::Failure(e) => Err(e.code.into()),
+            },
+        }
+    }
+
+    /// Read the header from a DTED file
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` (str): Path to the DTED file
+    /// 
+    /// # Returns
+    /// 
+    /// * [DTEDMetadata]: DTED metadata
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use dted2::DTEDData;
+    /// assert!(DTEDData::read_header("tests/test_data.dt2").is_ok());
+    /// ```
+    pub fn read_header(path: &str) -> Result<DTEDMetadata, DTEDError> {
+        let mut file = std::fs::File::open(path)?;
+        let mut content = Vec::new();
+        file.read_to_end(&mut content)?;
+        match parsers::dted_uhl_parser(&content) {
+            Ok((_, header)) => Ok(DTEDMetadata::from_header(&header, path)),
+            Err(e) => match e {
+                nom::Err::Incomplete(e) => Err(e.into()),
+                nom::Err::Error(e) | nom::Err::Failure(e) => Err(e.code.into()),
+            },
+        }
+    }
+
+    /// Get the elevation at a lat/lon
+    /// 
+    /// # Arguments
+    /// 
+    /// * `lat` - latitude
+    /// * `lon` - longitude
+    /// 
+    /// # Returns
+    /// 
+    /// * [Option<f64>]: elevation (in meters) or None if out of bounds
+    pub fn get_elev<T: Into<f64>, U: Into<f64>>(&self, lat: T, lon: U) -> Option<f64> {
+        // --------------------------------------------------
+        // check bounds
+        // --------------------------------------------------
+        let lat: f64 = lat.into();
+        let lon: f64 = lon.into();
+        if false
+            || lat < self.min.lat
+            || lat > self.max.lat
+            || lon < self.min.lon
+            || lon > self.max.lon
+        { return None }
+        // --------------------------------------------------
+        // get the indices + fractions
+        // --------------------------------------------------
+        let lat = (lat - self.min.lat) / self.metadata.interval.lat;
+        let lon = (lon - self.min.lon) / self.metadata.interval.lon;
+        let mut lat_int = lat as usize;
+        let mut lon_int = lon as usize;
+        let mut lat_frac = lat - lat_int as f64;
+        let mut lon_frac = lon - lon_int as f64;
+        // --------------------------------------------------
+        // handle the edge case of max lat/lon
+        // --------------------------------------------------
+        if lat_int == self.metadata.count.lat as usize - 1 {
+            lat_int -= 1;
+            lat_frac += 1.0;
+        }
+        if lon_int == self.metadata.count.lon as usize - 1 {
+            lon_int -= 1;
+            lon_frac += 1.0;
+        }
+        // --------------------------------------------------
+        // values for the 4 corners for bilinear interpolation
+        // --------------------------------------------------
+        let elev00 = self.data[lon_int].elevations[lat_int] as f64;
+        let elev01 = self.data[lon_int].elevations[lat_int + 1] as f64;
+        let elev10 = self.data[lon_int + 1].elevations[lat_int] as f64;
+        let elev11 = self.data[lon_int + 1].elevations[lat_int + 1] as f64;
+        // --------------------------------------------------
+        // return interpolated value
+        // --------------------------------------------------
+        let result = 0.0
+            + elev00 * (1.0 - lon_frac) * (1.0 - lat_frac)
+            + elev01 * (1.0 - lon_frac) * lat_frac
+            + elev10 * lon_frac * (1.0 - lat_frac)
+            + elev11 * lon_frac * lat_frac;
+        Some(result)
+    }
+}
+
+/// TODO
+/// 
 /// DTED Data Set Identification (DSI) Record
 /// 
 /// See: https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf 
@@ -132,15 +330,9 @@ pub struct DTEDRecordDSI {
     pub coverage: f64,
 }
 
+/// TODO
 pub struct DTEDRecordACC {
 
-}
-
-pub struct RawDTEDRecord {
-    pub blk_count: u32,
-    pub lon_count: u16,
-    pub lat_count: u16,
-    pub elevations: Vec<i16>,
 }
 
 pub struct RawDTEDFile {
@@ -150,113 +342,9 @@ pub struct RawDTEDFile {
     pub acc_record: Option<u8>,
 }
 
-pub struct DTEDData {
-    pub filename: String,
-    // pub header: RawDTEDHeader,
-    pub origin: AxisElement<Angle>,
-    pub interval: AxisElement<f64>,
-    pub accuracy: Option<u16>,
-    pub count: AxisElement<u16>,
-    pub data: Vec<RawDTEDRecord>,
-}
-
-// pub struct DTEDHeader {
-
-// }
-
-impl DTEDData {
-    pub fn from(path: &str) -> Result<DTEDData, DTEDError> {
-        let mut file = std::fs::File::open(path)?;
-        let mut content = Vec::new();
-        file.read_to_end(&mut content)?;
-        match parsers::parse_dted_file(&content) {
-            Ok((_, data)) => {
-                // let origin_lon: f64 = self.header.lon_origin.into();
-                let interval = data.header.interval_s / 36000.0;
-                let max = data.header.origin + interval * (data.header.count - 1);
-                Ok(DTEDData {
-                    filename: path.to_string(),
-                    min: data.header.origin,
-                    max: data.header.origin,
-                    interval: data.header.interval_s / 36000.0,
-                    accuracy: data.header.accuracy,
-                    count: data.header.count,
-                    data: data.data
-                })
-            },
-            Err(e) => match e {
-                nom::Err::Incomplete(e) => Err(e.into()),
-                nom::Err::Error(e) | nom::Err::Failure(e) => Err(e.code.into()),
-            },
-        }
-    }
-
-    // pub fn lat_interval(&self) -> f64 {
-    //     (self.header.lat_interval_s as f64) / 36000.0
-    // }
-
-    // pub fn lon_interval(&self) -> f64 {
-    //     (self.header.lon_interval_s as f64) / 36000.0
-    // }
-
-    // pub fn min_lat(&self) -> f64 {
-    //     self.header.lat_origin.into()
-    // }
-
-    // pub fn min_lon(&self) -> f64 {
-    //     self.header.lat_origin.into()
-    // }
-
-    // pub fn max_lat(&self) -> f64 {
-    //     let origin_lat: f64 = self.header.lat_origin.into();
-    //     origin_lat + self.lat_interval() * (self.header.lat_count - 1) as f64
-    // }
-
-    // pub fn max_lon(&self) -> f64 {
-    //     let origin_lon: f64 = self.header.lon_origin.into();
-    //     origin_lon + self.lon_interval() * (self.header.lat_count - 1) as f64
-    // }
-
-    // pub fn get_elev<T: Into<f64>, U: Into<f64>>(&self, lat: T, lon: U) -> Option<f64> {
-    //     let lat = lat.into();
-    //     let lon = lon.into();
-    //     if lat < self.min_lat()
-    //         || lat > self.max_lat()
-    //         || lon < self.min_lon()
-    //         || lon > self.max_lon()
-    //     {
-    //         return None;
-    //     }
-    //     let lat = (lat - self.min_lat()) / self.lat_interval();
-    //     let lon = (lon - self.min_lon()) / self.lon_interval();
-
-    //     let mut lat_int = lat as usize;
-    //     let mut lon_int = lon as usize;
-
-    //     let mut lat_frac = lat - lat_int as f64;
-    //     let mut lon_frac = lon - lon_int as f64;
-
-    //     // handle the edge case of max lat/lon
-    //     if lat_int == self.header.lat_count as usize - 1 {
-    //         lat_int -= 1;
-    //         lat_frac += 1.0;
-    //     }
-    //     if lon_int == self.header.lat_count as usize - 1 {
-    //         lon_int -= 1;
-    //         lon_frac += 1.0;
-    //     }
-
-    //     // get values to interpolate
-    //     let elev00 = self.data[lon_int].elevations[lat_int] as f64;
-    //     let elev01 = self.data[lon_int].elevations[lat_int + 1] as f64;
-    //     let elev10 = self.data[lon_int + 1].elevations[lat_int] as f64;
-    //     let elev11 = self.data[lon_int + 1].elevations[lat_int + 1] as f64;
-
-    //     let result = elev00 * (1.0 - lon_frac) * (1.0 - lat_frac)
-    //         + elev01 * (1.0 - lon_frac) * lat_frac
-    //         + elev10 * lon_frac * (1.0 - lat_frac)
-    //         + elev11 * lon_frac * lat_frac;
-
-    //     Some(result)
-    // }
+pub struct RawDTEDRecord {
+    pub blk_count: u32,
+    pub lon_count: u16,
+    pub lat_count: u16,
+    pub elevations: Vec<i16>,
 }
