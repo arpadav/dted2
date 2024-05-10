@@ -239,7 +239,7 @@ impl DTEDData {
     /// # Returns
     /// 
     /// * [Option<f64>]: elevation (in meters) or None if out of bounds
-    pub fn get_elev<T: Into<f64>, U: Into<f64>>(&self, lat: T, lon: U) -> Option<f64> {
+    pub fn get_elevation<T: Into<f64>, U: Into<f64>>(&self, lat: T, lon: U) -> Option<f64> {
         // --------------------------------------------------
         // check bounds
         // --------------------------------------------------
