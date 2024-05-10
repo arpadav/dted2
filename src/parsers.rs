@@ -3,11 +3,6 @@
 // --------------------------------------------------
 // external
 // --------------------------------------------------
-use std::{
-    fs::File,
-    io::Read,
-    path::Path,
-};
 use nom::{
     IResult,
     branch::alt,
@@ -48,27 +43,27 @@ use crate::primitives::{
 const U16_SIGN_BIT: u16 = 0x8000;
 const U16_DATA_MSK: u16 = 0x7FFF;
 
+/// Parses a byte slice into an unsigned integer
+/// - Max precision is 32 bits (4294967296)
+/// 
+/// # Arguments
+/// 
+/// * `input` - A byte slice
+/// 
+/// # Returns
+/// 
+/// An option containing an unsigned integer
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::to_uint;
+/// assert_eq!(to_uint::<u32>(b"123"), 123 as u32);
+/// ```
 fn to_uint<U>(input: &[u8]) -> Option<U>
 where
     U: PrimInt + Unsigned,
 {
-    /// Parses a byte slice into an unsigned integer
-    /// - Max precision is 32 bits (4294967296)
-    /// 
-    /// # Arguments
-    /// 
-    /// * `input` - A byte slice
-    /// 
-    /// # Returns
-    /// 
-    /// An option containing an unsigned integer
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::to_uint;
-    /// assert_eq!(to_uint::<u32>(b"123"), 123 as u32);
-    /// ```
     U::from(
         input
         .iter()
@@ -79,27 +74,27 @@ where
     )
 }
 
+/// Nom parser that parses `count` number of bytes and returns an unsigned integer
+/// 
+/// # Arguments
+/// 
+/// * `count` - The number of bytes to parse
+/// 
+/// # Returns
+/// 
+/// A result containing an unsigned integer of length `num`, or an error if
+/// the input is invalid
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::uint_char_parser;
+/// assert_eq!(uint_char_parser::<u32>(3)(b"123"), Ok((&b""[..], 123 as u32)));
+/// ```
 fn uint_parser<U>(count: usize) -> impl Fn(&[u8]) -> IResult<&[u8], U> 
 where
     U: PrimInt + Unsigned
 {
-    /// Nom parser that parses `count` number of bytes and returns an unsigned integer
-    /// 
-    /// # Arguments
-    /// 
-    /// * `count` - The number of bytes to parse
-    /// 
-    /// # Returns
-    /// 
-    /// A result containing an unsigned integer of length `num`, or an error if
-    /// the input is invalid
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::uint_char_parser;
-    /// assert_eq!(uint_char_parser::<u32>(3)(b"123"), Ok((&b""[..], 123 as u32)));
-    /// ```
     move |input|
         map_res(take(count), |bytes: &[u8]| {
             to_uint::<U>(bytes)
@@ -107,30 +102,30 @@ where
         })(input)
 }
 
+/// Nom parser that parses `count` number of bytes and returns an unsigned integer
+/// If `count` is 0, a default value `default` is returned
+/// 
+/// # Arguments
+/// 
+/// * `count` - The number of bytes to parse
+/// * `default` - The default value to return if `count` is 0
+/// 
+/// # Returns
+/// 
+/// A [std::result::Result] containing an unsigned integer of length `count`, or an error if
+/// the input is invalid. If `count` is 0, `default` is returned
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted::uint_char_parser_with_default;
+/// assert_eq!(uint_char_parser_with_default::<u32>(3, 0)(b"123"), Ok((&b""[..], 123 as u32)));
+/// assert_eq!(uint_char_parser_with_default::<u32>(0, 0)(b"123"), Ok((&b""[..], 0 as u32)));
+/// ```
 fn uint_parser_with_default<U>(count: usize, default: U) -> impl Fn(&[u8]) -> IResult<&[u8], U> 
 where
     U: PrimInt + Unsigned
 {
-    /// Nom parser that parses `count` number of bytes and returns an unsigned integer
-    /// If `count` is 0, a default value `default` is returned
-    /// 
-    /// # Arguments
-    /// 
-    /// * `count` - The number of bytes to parse
-    /// * `default` - The default value to return if `count` is 0
-    /// 
-    /// # Returns
-    /// 
-    /// A [std::result::Result] containing an unsigned integer of length `count`, or an error if
-    /// the input is invalid. If `count` is 0, `default` is returned
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted::uint_char_parser_with_default;
-    /// assert_eq!(uint_char_parser_with_default::<u32>(3, 0)(b"123"), Ok((&b""[..], 123 as u32)));
-    /// assert_eq!(uint_char_parser_with_default::<u32>(0, 0)(b"123"), Ok((&b""[..], 0 as u32)));
-    /// ```
     move |input|
         match count {
             0 => Ok((input, default)),
@@ -138,28 +133,28 @@ where
         }
 }
 
+/// Parses a byte slice into a [crate::primitives::Angle]
+/// 
+/// # Arguments
+/// 
+/// * `input` - A byte slice
+/// * `num_deg` - The number of bytes to parse for degrees
+/// * `num_min` - The number of bytes to parse for minutes
+/// * `num_sec` - The number of bytes to parse for seconds
+/// 
+/// # Returns
+/// 
+/// An [Option] containing a [crate::primitives::Angle]
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::to_angle;
+/// use dted2::primitives::Angle;
+/// assert_eq!(to_angle(b"12345", 3, 1, 1), Ok((&b""[..], Angle { deg: 123, min: 4, sec: 5 })));
+/// assert_eq!(to_angle(b"12345W", 3, 1, 1), Ok((&b""[..], Angle { deg: -123, min: 4, sec: 5 })));
+/// ```
 fn to_angle(input: &[u8], num_deg: usize, num_min: usize, num_sec: usize) -> IResult<&[u8], Angle> {
-    /// Parses a byte slice into a [crate::primitives::Angle]
-    /// 
-    /// # Arguments
-    /// 
-    /// * `input` - A byte slice
-    /// * `num_deg` - The number of bytes to parse for degrees
-    /// * `num_min` - The number of bytes to parse for minutes
-    /// * `num_sec` - The number of bytes to parse for seconds
-    /// 
-    /// # Returns
-    /// 
-    /// An [Option] containing a [crate::primitives::Angle]
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::to_angle;
-    /// use dted2::primitives::Angle;
-    /// assert_eq!(to_angle(b"12345", 3, 1, 1), Ok((&b""[..], Angle { deg: 123, min: 4, sec: 5 })));
-    /// assert_eq!(to_angle(b"12345W", 3, 1, 1), Ok((&b""[..], Angle { deg: -123, min: 4, sec: 5 })));
-    /// ```
     let (input, (
         deg,
         min,
@@ -179,53 +174,53 @@ fn to_angle(input: &[u8], num_deg: usize, num_min: usize, num_sec: usize) -> IRe
     Ok((input, Angle::new(
         (deg as i16) * sign.unwrap_or(1i16),
         min as u8,
-        sec as u8
+        sec as f64,
     )))
 }
 
+/// Nom parser that parses `num_deg`, `num_min`, and `num_sec` number of bytes and returns an angle
+/// 
+/// # Arguments
+/// 
+/// * `num_deg` - The number of bytes to parse for degrees
+/// * `num_min` - The number of bytes to parse for minutes
+/// * `num_sec` - The number of bytes to parse for seconds
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::primitives::Angle;
+/// use dted2::parsers::angle_parser;
+/// assert_eq!(angle_parser(3, 1, 1)(b"12345"), Ok((&b""[..], Angle { deg: 123, min: 4, sec: 5 })));
+/// assert_eq!(angle_parser(3, 1, 1)(b"12345W"), Ok((&b""[..], Angle { deg: -123, min: 4, sec: 5 })));
+/// ```
 fn angle_parser(num_deg: usize, num_min: usize, num_sec: usize) -> impl Fn(&[u8]) -> IResult<&[u8], Angle> {
-    /// Nom parser that parses `num_deg`, `num_min`, and `num_sec` number of bytes and returns an angle
-    /// 
-    /// # Arguments
-    /// 
-    /// * `num_deg` - The number of bytes to parse for degrees
-    /// * `num_min` - The number of bytes to parse for minutes
-    /// * `num_sec` - The number of bytes to parse for seconds
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::primitives::Angle;
-    /// use dted2::parsers::angle_parser;
-    /// assert_eq!(angle_parser(3, 1, 1)(b"12345"), Ok((&b""[..], Angle { deg: 123, min: 4, sec: 5 })));
-    /// assert_eq!(angle_parser(3, 1, 1)(b"12345W"), Ok((&b""[..], Angle { deg: -123, min: 4, sec: 5 })));
-    /// ```
     move |input| to_angle(input, num_deg, num_min, num_sec)
 }
 
+/// Parses a byte slice into an unsigned integer, 
+/// if the value is not a valid NAN DTED value
+/// 
+/// # Arguments
+/// 
+/// * `input` - A byte slice
+/// 
+/// # Returns
+/// 
+/// A [Option] containing a unsigned integer. Is None
+/// if the value is a valid NAN value
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::nan_parser;
+/// assert_eq!(nan_parser(b"NA$$", 4), Ok((&b""[..], None)));
+/// assert_eq!(nan_parser<u32>(b"12345", 4), Ok((&b""[..], Some(1234 as u32))));
+/// ```
 fn to_nan<U>(input: &[u8], count: usize) -> IResult<&[u8], Option<U>>
 where
     U: PrimInt + Unsigned,
 {
-    /// Parses a byte slice into an unsigned integer, 
-    /// if the value is not a valid NAN DTED value
-    /// 
-    /// # Arguments
-    /// 
-    /// * `input` - A byte slice
-    /// 
-    /// # Returns
-    /// 
-    /// A [Option] containing a unsigned integer. Is None
-    /// if the value is a valid NAN value
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::nan_parser;
-    /// assert_eq!(nan_parser(b"NA$$", 4), Ok((&b""[..], None)));
-    /// assert_eq!(nan_parser<u32>(b"12345", 4), Ok((&b""[..], Some(1234 as u32))));
-    /// ```
     match tag::<_, _, nom::error::Error<_>>(RecognitionSentinel::NA.as_bytes())(input) {
         Ok((input, _)) => {
             let (input, _) = take(count - 2)(input)?;
@@ -244,30 +239,30 @@ where
     }
 }
 
+/// Nom parser for NAN (either Not a Number or Not Available) values in DTED
+/// If not a valid NAN value, then the value (unsigned integer)
+/// is returned as [Option::Some], otherwise [Option::None]
+/// 
+/// # Arguments
+/// 
+/// * `count` - The number of bytes to parse
+/// 
+/// # Returns
+/// 
+/// An [Option] containing an unsigned integer, 
+/// otherwise, if a valid NAN, returns [Option::None]
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::nan_parser;
+/// assert_eq!(nan_parser(4)(b"NA$$"), Ok((&b""[..], None)));
+/// assert_eq!(nan_parser<u32>(4)(b"12345"), Ok((&b""[..], Some(1234 as u32))));
+/// ```
 fn nan_parser<U>(count: usize) -> impl Fn(&[u8]) -> Result<(&[u8], Option<U>), nom::Err<nom::error::Error<&[u8]>>>
 where
     U: PrimInt + Unsigned,
 {
-    /// Nom parser for NAN values in DTED
-    /// If not a valid NAN value, then the value (unsigned integer)
-    /// is returned as [Option::Some], otherwise [Option::None]
-    /// 
-    /// # Arguments
-    /// 
-    /// * `count` - The number of bytes to parse
-    /// 
-    /// # Returns
-    /// 
-    /// An [Option] containing an unsigned integer, 
-    /// otherwise, if a valid NAN, returns [Option::None]
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::nan_parser;
-    /// assert_eq!(nan_parser(4)(b"NA$$"), Ok((&b""[..], None)));
-    /// assert_eq!(nan_parser<u32>(4)(b"12345"), Ok((&b""[..], Some(1234 as u32))));
-    /// ```
     move |input| to_nan(input, count)
 }
 
@@ -279,54 +274,54 @@ where
 //         x as i16
 //     }
 // }
+/// Convert signed magnitude int to i16
+/// 
+/// # Arguments
+/// 
+/// * `x` - The signed magnitude int (2 bytes, formatted as u16)
+/// 
+/// # Returns
+/// 
+/// An i16, converted from the signed magnitude int
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::to_i16;
+/// assert_eq!(to_i16(0x0000), 0);
+/// assert_eq!(to_i16(0x0003), 3);
+/// assert_eq!(to_i16(0x8003), -3);
+/// assert_eq!(to_i16(0x7fff), 32767);
+/// assert_eq!(to_i16(0xFFFF), -32767);
+/// ```
 fn to_i16(x: u16) -> i16 {
-    /// Convert signed magnitude int to i16
-    /// 
-    /// # Arguments
-    /// 
-    /// * `x` - The signed magnitude int (2 bytes, formatted as u16)
-    /// 
-    /// # Returns
-    /// 
-    /// An i16, converted from the signed magnitude int
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::to_i16;
-    /// assert_eq!(to_i16(0x0000), 0);
-    /// assert_eq!(to_i16(0x0003), 3);
-    /// assert_eq!(to_i16(0x8003), -3);
-    /// assert_eq!(to_i16(0x7fff), 32767);
-    /// assert_eq!(to_i16(0xFFFF), -32767);
-    /// ```
     let v = (x & U16_DATA_MSK) as i16;          // mask out the sign bit and get the value
     let s = ((x & U16_SIGN_BIT) >> 15) as i16;  // extract sign bit and extend to i16 directly
     (1 - (s << 1)) * v                          // branchless negation, return (1 - 2s) * v
 }
 
+/// Nom parser for signed magnitude values in DTED
+/// 
+/// # Arguments
+/// 
+/// * `input` - A byte slice
+/// 
+/// # Returns
+/// 
+/// An [i16] parsed from the byte slice, using signed magnitude
+/// convention
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::signed_mag_parser;
+/// assert_eq!(signed_mag_parser(&[0x00, 0x00, ..]), Ok((&b""[..], 0)));
+/// assert_eq!(signed_mag_parser(&[0x00, 0x03, ..]), Ok((&b""[..], 3)));
+/// assert_eq!(signed_mag_parser(&[0x80, 0x03, ..]), Ok((&b""[..], -3)));
+/// assert_eq!(signed_mag_parser(&[0x7f, 0xff, ..]), Ok((&b""[..], 32767)));
+/// assert_eq!(signed_mag_parser(&[0xff, 0xff, ..]), Ok((&b""[..], -32767)));
+/// ```
 fn signed_mag_parser(input: &[u8]) -> IResult<&[u8], i16> {
-    /// Nom parser for signed magnitude values in DTED
-    /// 
-    /// # Arguments
-    /// 
-    /// * `input` - A byte slice
-    /// 
-    /// # Returns
-    /// 
-    /// An [i16] parsed from the byte slice, using signed magnitude
-    /// convention
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::signed_mag_parser;
-    /// assert_eq!(signed_mag_parser(&[0x00, 0x00, ..]), Ok((&b""[..], 0)));
-    /// assert_eq!(signed_mag_parser(&[0x00, 0x03, ..]), Ok((&b""[..], 3)));
-    /// assert_eq!(signed_mag_parser(&[0x80, 0x03, ..]), Ok((&b""[..], -3)));
-    /// assert_eq!(signed_mag_parser(&[0x7f, 0xff, ..]), Ok((&b""[..], 32767)));
-    /// assert_eq!(signed_mag_parser(&[0xff, 0xff, ..]), Ok((&b""[..], -32767)));
-    /// ```
     map_res(
         take(2_usize),
         |bytes: &[u8]| Ok::<i16, nom::Err<nom::error::Error<&[u8]>>>(
@@ -335,33 +330,33 @@ fn signed_mag_parser(input: &[u8]) -> IResult<&[u8], i16> {
     )(input)
 }
 
+/// Nom parser for a [dted2::dted::DTEDHeader]
+/// 
+/// # Arguments
+/// 
+/// * `input` - A byte slice
+/// 
+/// # Returns
+/// 
+/// A [dted2::dted::DTEDHeader] parsed from the byte slice
+/// 
+/// # Examples
+/// 
+/// ```
+/// use dted2::parsers::dted_uhl_parser;
+/// use dted2::dted::DTEDHeader;
+/// use dted2::dted::AxisElement;
+/// use dted2::dted::RecognitionSentinel;
+/// 
+/// assert_eq!(dted_uhl_parser(b"UHL1123456789012345W123456789012345W123456789012345W"), Ok((&b""[..], DTEDHeader {
+///     origin: AxisElement { lat: 12345, lon: 12345 },
+///     interval_s: AxisElement { lat: 12345, lon: 12345 },
+///     accuracy: 12345,
+///     count: AxisElement { lat: 12345, lon: 12345 },
+///     sentinel: RecognitionSentinel::UHL
+/// })));
+/// ```
 fn dted_uhl_parser(input: &[u8]) -> IResult<&[u8], RawDTEDHeader> {
-    /// Nom parser for a [dted2::dted::DTEDHeader]
-    /// 
-    /// # Arguments
-    /// 
-    /// * `input` - A byte slice
-    /// 
-    /// # Returns
-    /// 
-    /// A [dted2::dted::DTEDHeader] parsed from the byte slice
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// use dted2::parsers::dted_uhl_parser;
-    /// use dted2::dted::DTEDHeader;
-    /// use dted2::dted::AxisElement;
-    /// use dted2::dted::RecognitionSentinel;
-    /// 
-    /// assert_eq!(dted_uhl_parser(b"UHL1123456789012345W123456789012345W123456789012345W"), Ok((&b""[..], DTEDHeader {
-    ///     origin: AxisElement { lat: 12345, lon: 12345 },
-    ///     interval_s: AxisElement { lat: 12345, lon: 12345 },
-    ///     accuracy: 12345,
-    ///     count: AxisElement { lat: 12345, lon: 12345 },
-    ///     sentinel: RecognitionSentinel::UHL
-    /// })));
-    /// ```
     // --------------------------------------------------
     // verify is UHL
     // --------------------------------------------------
@@ -407,8 +402,8 @@ pub fn parse_dted_file(input: &[u8]) -> IResult<&[u8], RawDTEDFile> {
     // --------------------------------------------------
     let (input, (
         header,
-        dsi_record,
-        acc_record,
+        _dsi_record,
+        _acc_record,
     )) = tuple((
         dted_uhl_parser,
         take(DT2_DSI_RECORD_LENGTH),
@@ -463,17 +458,6 @@ pub fn parse_dted_record(input: &[u8], line_len: usize) -> IResult<&[u8], RawDTE
         elevations,
     }))
 }
-
-
-// pub fn read_dted<P: AsRef<Path>>(path: P) -> Result<DTEDFile, Error> {
-//     let mut file = File::open(path)?;
-//     let mut content = Vec::new();
-//     file.read_to_end(&mut content)?;
-//     match parse_dted_file(&content) {
-//         Ok((_, data)) => Ok(data),
-//         Err(e) => Err(Error::from(e))
-//     }
-// }
 
 // pub fn read_dted_header<P: AsRef<Path>>(path: P) -> Result<DTEDHeader, Error> {
 //     let file = File::open(path)?;
