@@ -1,49 +1,49 @@
-use num_traits::{Float, FloatConst, FromPrimitive, NumCast, ToPrimitive};
 use std::ops::{ Add, Sub, Mul, Div };
+use num_traits::{ ToPrimitive, FromPrimitive };
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 /// An angle in degrees, minutes, and seconds
 /// See: https://en.wikipedia.org/wiki/Geographic_coordinate_system
 /// 
-/// See [crate::primitives::Angle] for more information
+/// See [Angle] for more information
 /// 
 /// # Example
 /// 
 /// ```
 /// use dted2::primitives::Angle;
-/// let angle = Angle { deg: 0, min: 0, sec: 0 };
-/// assert_eq!(angle, Angle { deg: 0, min: 0, sec: 0 });
+/// let angle = Angle { deg: 0, min: 0, sec: 0.0 };
+/// assert_eq!(angle, Angle { deg: 0, min: 0, sec: 0.0 });
 /// ```
 pub struct Angle {
     pub deg: i16,
     pub min: u8,
-    pub sec: u8,
-    pub total_sec: i32,
+    pub sec: f64,
+    pub total_sec: f64,
 }
 impl Angle {
-    pub fn new(deg: i16, min: u8, sec: u8) -> Self {
+    pub fn new(deg: i16, min: u8, sec: f64) -> Self {
         // Converts degrees, minutes, and seconds to an angle
         // 
         // # Arguments
         // 
         // * `deg` - The number of degrees
         // * `min` - The number of minutes
-        // * `sec` - The number of seconds
+        // * `sec` - The number of seconds (floating point precision)
         // 
         // # Returns
         // 
-        // The `Angle` with the number of degrees, minutes, and seconds
+        // The [Angle] with the number of degrees, minutes, and seconds
         Angle {
             deg,
             min,
             sec,
-            total_sec: deg as i32 * 3600 + min as i32 * 60 + sec as i32,
+            total_sec: (deg as i32 * 3600 + min as i32 * 60) as f64 + sec,
         }
     }
 
-    pub fn from_secs(total_sec: i32) -> Self {
+    pub fn from_secs(total_sec: f64) -> Self {
         // Converts seconds to degrees, minutes, and seconds
-        // AKA an `Angle`
+        // AKA an [Angle]
         // 
         // # Arguments
         // 
@@ -68,7 +68,7 @@ impl Angle {
         }
     }
 
-    fn sec2deg(sec: &i32) -> i16 {
+    fn sec2deg(sec: &f64) -> i16 {
         // Converts seconds to degrees
         // 
         // # Arguments
@@ -78,10 +78,10 @@ impl Angle {
         // # Returns
         //
         // The number of degrees
-        (sec / 3600) as i16
+        *sec as i16 / 3600
     }
 
-    fn sec2min(sec: &i32) -> u8 {
+    fn sec2min(sec: &f64) -> u8 {
         // Converts seconds to minutes
         // 
         // # Arguments
@@ -91,10 +91,10 @@ impl Angle {
         // # Returns
         //
         // The number of minutes
-        ((sec % 3600) / 60) as u8
+        ((*sec as u64 % 3600) / 60) as u8
     }
 
-    fn sec2sec(sec: &i32) -> u8 {
+    fn sec2sec(sec: &f64) -> f64 {
         // Converts seconds to seconds
         // 
         // # Arguments
@@ -104,67 +104,100 @@ impl Angle {
         // # Returns
         //
         // The number of seconds
-        (sec % 60) as u8
+        sec % 60.0
     }
 }
+/// Add's an [Angle] to another [Angle]
+/// 
+/// # Returns
+/// 
+/// * [Angle]
 impl Add for Angle {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        let sec = self.sec as u16 + rhs.sec as u16;
-        let min_overflow = sec / 60;
-        let sec = (sec % 60) as u8;
-        let min = self.min as u16 + rhs.min as u16 + min_overflow;
+        let sec = self.sec + rhs.sec;
+        let min_overflow = sec / 60.0;
+        let sec = sec % 60.0;
+        let min = self.min as u16 + rhs.min as u16 + min_overflow as u16;
         let deg_overflow = min / 60;
         let min = (min % 60) as u8;
         let deg = self.deg + rhs.deg + deg_overflow as i16;
         Angle::new(deg, min, sec)
     }
 }
+/// Subtracts an [Angle] from another [Angle]
+/// 
+/// # Returns
+/// 
+/// * [Angle]
 impl Sub for Angle {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        let sec_underflow = ((self.sec as i16 - rhs.sec as i16) >> 8) & 1; // results in 1 if underflow
-        let sec = ((self.sec as i16 - rhs.sec as i16 + 60) % 60) as u8;
-        let min_underflow = ((self.min as i16 - rhs.min as i16 - sec_underflow) >> 8) & 1; // results in 1 if underflow
-        let min = ((self.min as i16 - rhs.min as i16 - sec_underflow + 60) % 60) as u8;
+        let sec_diff = self.sec - rhs.sec;
+        let sec_underflow = sec_diff.is_sign_negative() as i16;
+        let sec = (sec_diff + 60.0 * sec_underflow as f64) % 60.0;
+        let min_diff = self.min as i16 - rhs.min as i16 - sec_underflow;
+        let min_underflow = min_diff.is_negative() as i16;
+        let min = ((min_diff + 60 * min_underflow) % 60) as u8;
         let deg = self.deg - rhs.deg - min_underflow;
         Angle::new(deg, min, sec)
     }
 }
-impl<T> Mul<T> for Angle
-where
-    T: Copy + NumCast,
-{
+/// Multiplies an [Angle] by another [Angle]
+/// 
+/// # Returns
+/// 
+/// * [Angle]
+impl Mul for Angle {
     type Output = Self;
-    fn mul(self, rhs: T) -> Self::Output {
-        Angle::from_secs(self.total_sec * NumCast::from(rhs).unwrap_or(0) as i32)
-    }
-}
-impl Mul<Angle> for Angle {
-    type Output = Self;
-    fn mul(self, rhs: Angle) -> Self::Output {
+    fn mul(self, rhs: Self) -> Self::Output {
         Angle::from_secs(self.total_sec * rhs.total_sec)
     }
 }
-impl Div<Angle> for Angle {
+/// Multiplies an [Angle] by a scalar `M` (max precision of f64)
+/// 
+/// # Returns
+/// 
+/// * [Angle]
+impl<T> Mul<T> for Angle
+where
+    T: ToPrimitive,
+{
     type Output = Self;
-    fn div(self, rhs: Angle) -> Self::Output {
+    fn mul(self, rhs: T) -> Self::Output {
+        Angle::from_secs(self.total_sec * T::to_f64(&rhs).unwrap_or(0.0))
+    }
+}
+/// Divides an [Angle] by another [Angle]
+/// 
+/// # Returns
+/// 
+/// * [Angle]
+impl Div for Angle {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
         Angle::from_secs(self.total_sec / rhs.total_sec)
     }
 }
+/// Divides an [Angle] by a scalar `M` (max precision of f64)
+/// 
+/// # Returns
+/// 
+/// * [Angle]
 impl<T> Div<T> for Angle
 where
-    T: Copy + NumCast,
+    T: ToPrimitive,
 {
     type Output = Self;
     fn div(self, rhs: T) -> Self::Output {
-        Angle::from_secs(self.total_sec / NumCast::from(rhs).unwrap_or(1) as i32)
+        Angle::from_secs(self.total_sec / T::to_f64(&rhs).unwrap_or(1.0))
     }
 }
+/// Converts an [Angle] to radians of variable precision
 macro_rules! impl_angle_into_type {
     ($($type:ty),*) => {
         $(
-            #[doc = concat!(" Converts an `Angle` (degrees, minutes, seconds) to radians as ")]
+            #[doc = concat!(" Converts an [Angle] (degrees, minutes, seconds) to radians as ")]
             #[doc = concat!(" a specific numeric type (`", stringify!($type), "`).")]
             #[doc = concat!("")]
             #[doc = concat!(" # Example")]
@@ -184,6 +217,15 @@ macro_rules! impl_angle_into_type {
                     )
                 }
             }
+            #[doc = concat!(" Converts an [AxisElement<Angle>] to [AxisElement<", stringify!($type), ">].")]
+            impl ::std::convert::Into<AxisElement<$type>> for AxisElement<Angle> {
+                fn into(self) -> AxisElement<$type> {
+                    AxisElement {
+                        lat: self.lat.into(),
+                        lon: self.lon.into(),
+                    }
+                }
+            }
         )*
     };
 }
@@ -195,31 +237,13 @@ impl_angle_into_type!(i64);
 impl_angle_into_type!(i128);
 impl_angle_into_type!(isize);
 
-// /// An axis within a defined grid (either latitude or longitude)
-// /// 
-// /// * `min` (f64): grid axis minimum value
-// /// * `max` (f64): grid axis maximum value
-// /// * `interval` (f64): grid axis interval (in meters)
-// pub struct Axis {
-//     min: f64,
-//     max: f64,
-//     interval: f64,
-// }
-
-// /// An axis within a defined grid (either latitude or longitude)
-// /// 
-// /// * `min` (f64): grid axis minimum value
-// /// * `max` (f64): grid axis maximum value
-// /// * `interval` (f64): grid axis interval (in meters)
-// struct Axis {
-//     min: AxisElement<f64>,
-//     max: AxisElement<f64>,
-//     interval: AxisElement<f64>,
-// }
-
-/// An axis element
+#[derive(Copy, Clone, Debug, PartialEq)]
+/// An Axis element
 /// 
+/// # Fields
 /// 
+/// * `lat`: Latitude
+/// * `lon`: Longitude
 pub struct AxisElement<T> {
     pub lat: T,
     pub lon: T,
@@ -229,6 +253,11 @@ impl<T> AxisElement<T> {
         Self { lat, lon }
     }
 }
+/// Adds a [AxisElement]<[Angle]> to another [AxisElement]<[Angle]>
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
 impl Add for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
     fn add(self, rhs: Self) -> Self::Output {
@@ -238,6 +267,53 @@ impl Add for AxisElement<Angle> {
         }
     }
 }
+/// Adds a to a scalar `A` (max precision of f64) to a [AxisElement]`<T>`
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
+impl<A, T> Add<A> for AxisElement<T>
+where
+    A: Copy + ToPrimitive,
+    T: Copy + FromPrimitive + Add<Output = T>,
+{
+    type Output = AxisElement<T>;
+    fn add(self, rhs: A) -> Self::Output {
+        let rhs = A::to_f64(&rhs).expect("Failed to convert RHS to f64");
+        AxisElement {
+            lat: self.lat + T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: self.lon + T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+        }
+    }
+}
+/// Adds a [AxisElement]`<A>` to a scalar [AxisElement]`<T>`,
+/// using max precision of f64
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
+impl<A, T> Add<AxisElement<A>> for AxisElement<T>
+where
+    A: ToPrimitive,
+    T: ToPrimitive + FromPrimitive + Add<Output = T>,
+{
+    type Output = AxisElement<T>;
+    fn add(self, rhs: AxisElement<A>) -> Self::Output {
+        let rhs_lat: f64 = A::to_f64(&rhs.lat).expect("Failed to convert RHS lat to f64");
+        let rhs_lon: f64 = A::to_f64(&rhs.lon).expect("Failed to convert RHS lon to f64");
+        let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
+        let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
+        AxisElement {
+            lat: T::from_f64(lat + rhs_lat).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: T::from_f64(lon + rhs_lon).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+        }
+    }
+}
+/// Subtracts a [AxisElement]<[Angle]> from another [AxisElement]<[Angle]>
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
 impl Sub for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -247,6 +323,53 @@ impl Sub for AxisElement<Angle> {
         }
     }
 }
+/// Subtracts a scalar `S` (max precision of f64) from a [AxisElement]`<T>`
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
+impl<S, T> Sub<S> for AxisElement<T>
+where
+    S: Copy + ToPrimitive,
+    T: Copy + FromPrimitive + Sub<Output = T>,
+{
+    type Output = AxisElement<T>;
+    fn sub(self, rhs: S) -> Self::Output {
+        let rhs = S::to_f64(&rhs).expect("Failed to convert RHS to f64");
+        AxisElement {
+            lat: self.lat - T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: self.lon - T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+        }
+    }
+}
+/// Subtracts a [AxisElement]`<S>` from a [AxisElement]`<T>`, 
+/// using max precision of f64
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
+impl<S, T> Sub<AxisElement<S>> for AxisElement<T>
+where
+    S: ToPrimitive,
+    T: ToPrimitive + FromPrimitive + Sub<Output = T>,
+{
+    type Output = AxisElement<T>;
+    fn sub(self, rhs: AxisElement<S>) -> Self::Output {
+        let rhs_lat: f64 = S::to_f64(&rhs.lat).expect("Failed to convert RHS lat to f64");
+        let rhs_lon: f64 = S::to_f64(&rhs.lon).expect("Failed to convert RHS lon to f64");
+        let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
+        let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
+        AxisElement {
+            lat: T::from_f64(lat - rhs_lat).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: T::from_f64(lon - rhs_lon).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+        }
+    }
+}
+/// Multiplies a [AxisElement]<[Angle]> by another [AxisElement]<[Angle]>
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
 impl Mul for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
     fn mul(self, rhs: Self) -> Self::Output {
@@ -256,9 +379,28 @@ impl Mul for AxisElement<Angle> {
         }
     }
 }
+/// Multiplies a [AxisElement]<[Angle]> by a [Angle]
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
+impl Mul<Angle> for AxisElement<Angle> {
+    type Output = AxisElement<Angle>;
+    fn mul(self, rhs: Angle) -> Self::Output {
+        AxisElement {
+            lat: self.lat * rhs,
+            lon: self.lon * rhs,
+        }
+    }
+}
+/// Multiplies a [AxisElement]<[Angle]> by a scalar `M` (max precision of f64)
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
 impl<M> Mul<M> for AxisElement<Angle>
 where
-    M: Copy + NumCast,
+    M: Copy + ToPrimitive,
 {
     type Output = AxisElement<Angle>;
     fn mul(self, rhs: M) -> Self::Output {
@@ -268,10 +410,54 @@ where
         }
     }
 }
+/// Multiplies a [AxisElement]<[Angle]> by a [AxisElement]`<M>`
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
+impl<M> Mul<AxisElement<M>> for AxisElement<Angle>
+where
+    M: Copy + ToPrimitive,
+{
+    type Output = AxisElement<Angle>;
+    fn mul(self, rhs: AxisElement<M>) -> Self::Output {
+        AxisElement {
+            lat: self.lat * rhs.lat,
+            lon: self.lon * rhs.lon,
+        }
+    }
+}
+/// Multiplies a [AxisElement]`<T>` by a [AxisElement]`<M>`
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
+impl<M, T> Mul<AxisElement<M>> for AxisElement<T>
+where
+    M: ToPrimitive + FromPrimitive,
+    T: ToPrimitive,
+{
+    type Output = AxisElement<M>;
+    fn mul(self, rhs: AxisElement<M>) -> Self::Output {
+        let rhs_lat: f64 = M::to_f64(&rhs.lat).expect("Failed to convert RHS lat to f64");
+        let rhs_lon: f64 = M::to_f64(&rhs.lon).expect("Failed to convert RHS lon to f64");
+        let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
+        let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
+        AxisElement {
+            lat: M::from_f64(lat * rhs_lat).expect("Failed to convert latitude from f64"),
+            lon: M::from_f64(lon * rhs_lon).expect("Failed to convert longitude from f64"),
+        }
+    }
+}
+/// Multiplies a [AxisElement]`<T>` by a scalar `M` (max precision of f64)
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
 impl<M, T> Mul<M> for AxisElement<T>
 where
-    M: Copy + ToPrimitive + FromPrimitive,
-    T: Copy + ToPrimitive + FromPrimitive,
+    M: ToPrimitive + FromPrimitive,
+    T: ToPrimitive,
 {
     type Output = AxisElement<M>;
     fn mul(self, rhs: M) -> Self::Output {
@@ -284,6 +470,11 @@ where
         }
     }
 }
+/// Divides a [AxisElement]<[Angle]> by another [AxisElement]<[Angle]>
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
 impl Div for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
     fn div(self, rhs: Self) -> Self::Output {
@@ -293,9 +484,28 @@ impl Div for AxisElement<Angle> {
         }
     }
 }
+/// Divides a [AxisElement]<[Angle]> by a [Angle]
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
+impl Div<Angle> for AxisElement<Angle> {
+    type Output = AxisElement<Angle>;
+    fn div(self, rhs: Angle) -> Self::Output {
+        AxisElement {
+            lat: self.lat / rhs,
+            lon: self.lon / rhs,
+        }
+    }
+}
+/// Divides a [AxisElement]<[Angle]> by a scalar `D` (max precision of f64)
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
 impl<D> Div<D> for AxisElement<Angle>
 where
-    D: Copy + NumCast,
+    D: Copy + ToPrimitive,
 {
     type Output = AxisElement<Angle>;
     fn div(self, rhs: D) -> Self::Output {
@@ -305,10 +515,54 @@ where
         }
     }
 }
+/// Divides a [AxisElement]<[Angle]> by a [AxisElement]`<D>`
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]<[Angle]>
+impl<D> Div<AxisElement<D>> for AxisElement<Angle>
+where
+    D: Copy + ToPrimitive,
+{
+    type Output = AxisElement<Angle>;
+    fn div(self, rhs: AxisElement<D>) -> Self::Output {
+        AxisElement {
+            lat: self.lat / rhs.lat,
+            lon: self.lon / rhs.lon,
+        }
+    }
+}
+/// Divides a [AxisElement]`<T>` by a [AxisElement]`<D>`
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
+impl<D, T> Div<AxisElement<D>> for AxisElement<T>
+where
+    D: Copy + ToPrimitive + FromPrimitive,
+    T: Copy + ToPrimitive,
+{
+    type Output = AxisElement<D>;
+    fn div(self, rhs: AxisElement<D>) -> Self::Output {
+        let rhs_lat: f64 = D::to_f64(&rhs.lat).expect("Failed to convert RHS lat to f64");
+        let rhs_lon: f64 = D::to_f64(&rhs.lon).expect("Failed to convert RHS lon to f64");
+        let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
+        let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
+        AxisElement {
+            lat: D::from_f64(lat / rhs_lat).expect("Failed to convert latitude from f64"),
+            lon: D::from_f64(lon / rhs_lon).expect("Failed to convert longitude from f64"),
+        }    
+    }    
+}
+/// Divides a [AxisElement]`<T>` by a scalar `D` (max precision of f64)
+/// 
+/// # Returns
+/// 
+/// * [AxisElement]`<T>`
 impl<D, T> Div<D> for AxisElement<T>
 where
     D: Copy + ToPrimitive + FromPrimitive,
-    T: Copy + ToPrimitive + FromPrimitive,
+    T: Copy + ToPrimitive,
 {
     type Output = AxisElement<D>;
     fn div(self, rhs: D) -> Self::Output {
