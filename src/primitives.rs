@@ -1,18 +1,24 @@
 use std::ops::{ Add, Sub, Mul, Div };
 use num_traits::{ ToPrimitive, FromPrimitive };
 
+/// Seconds -> Degrees
+pub const SEC2DEG: f64 = 3600.0;
+/// Seconds -> Minutes
+pub const SEC2MIN: f64 = 60.0;
+/// Minutes -> Degrees
+pub const MIN2DEG: f64 = 60.0;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// An angle in degrees, minutes, and seconds
-/// See: https://en.wikipedia.org/wiki/Geographic_coordinate_system
 /// 
-/// See [Angle] for more information
+/// See: https://en.wikipedia.org/wiki/Geographic_coordinate_system
 /// 
 /// # Example
 /// 
 /// ```
 /// use dted2::primitives::Angle;
-/// let angle = Angle { deg: 0, min: 0, sec: 0.0 };
-/// assert_eq!(angle, Angle { deg: 0, min: 0, sec: 0.0 });
+/// let angle = Angle::new(0, 1, 0.0);
+/// assert_eq!(angle, Angle::from_secs(60.0));
 /// ```
 pub struct Angle {
     pub deg: i16,
@@ -21,18 +27,18 @@ pub struct Angle {
     pub total_sec: f64,
 }
 impl Angle {
+    /// Converts degrees, minutes, and seconds to an angle
+    /// 
+    /// # Arguments
+    /// 
+    /// * `deg` - The number of degrees
+    /// * `min` - The number of minutes
+    /// * `sec` - The number of seconds (floating point precision)
+    /// 
+    /// # Returns
+    /// 
+    /// The [Angle] with the number of degrees, minutes, and seconds
     pub fn new(deg: i16, min: u8, sec: f64) -> Self {
-        // Converts degrees, minutes, and seconds to an angle
-        // 
-        // # Arguments
-        // 
-        // * `deg` - The number of degrees
-        // * `min` - The number of minutes
-        // * `sec` - The number of seconds (floating point precision)
-        // 
-        // # Returns
-        // 
-        // The [Angle] with the number of degrees, minutes, and seconds
         Angle {
             deg,
             min,
@@ -41,25 +47,25 @@ impl Angle {
         }
     }
 
+    /// Converts seconds to degrees, minutes, and seconds
+    /// AKA an [Angle]
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
+    /// # Returns
+    /// 
+    /// The number of degrees, minutes, and seconds
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use dted2::primitives::Angle;
+    /// let angle = Angle::from_secs(61.0);
+    /// assert_eq!(angle, Angle::new(0, 1, 1.0));
+    /// ```
     pub fn from_secs(total_sec: f64) -> Self {
-        // Converts seconds to degrees, minutes, and seconds
-        // AKA an [Angle]
-        // 
-        // # Arguments
-        // 
-        // * `sec` - The number of seconds
-        // 
-        // # Returns
-        // 
-        // The number of degrees, minutes, and seconds
-        // 
-        // # Examples
-        // 
-        // ```
-        // use dted2::primitives::Angle;
-        // let angle = Angle::from_secs(0);
-        // assert_eq!(angle, Angle { deg: 0, min: 0, sec: 0 });
-        // ```
         Angle {
             deg: Angle::sec2deg(&total_sec),
             min: Angle::sec2min(&total_sec),
@@ -68,42 +74,42 @@ impl Angle {
         }
     }
 
+    /// Converts seconds to degrees
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
+    /// # Returns
+    ///
+    /// The number of degrees
     fn sec2deg(sec: &f64) -> i16 {
-        // Converts seconds to degrees
-        // 
-        // # Arguments
-        // 
-        // * `sec` - The number of seconds
-        // 
-        // # Returns
-        //
-        // The number of degrees
         *sec as i16 / 3600
     }
 
+    /// Converts seconds to minutes
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
+    /// # Returns
+    ///
+    /// The number of minutes
     fn sec2min(sec: &f64) -> u8 {
-        // Converts seconds to minutes
-        // 
-        // # Arguments
-        // 
-        // * `sec` - The number of seconds
-        // 
-        // # Returns
-        //
-        // The number of minutes
         ((*sec as u64 % 3600) / 60) as u8
     }
 
+    /// Converts seconds to seconds
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
+    /// # Returns
+    ///
+    /// The number of seconds
     fn sec2sec(sec: &f64) -> f64 {
-        // Converts seconds to seconds
-        // 
-        // # Arguments
-        // 
-        // * `sec` - The number of seconds
-        // 
-        // # Returns
-        //
-        // The number of seconds
         sec % 60.0
     }
 }
@@ -204,9 +210,9 @@ macro_rules! impl_angle_into_type {
             #[doc = concat!("")]
             #[doc = concat!(" ```")]
             #[doc = concat!(" use dted2::primitives::Angle;")]
-            #[doc = concat!(" let angle = Angle { deg: 0, min: 0, sec: 0 };")]
+            #[doc = concat!(" let angle = Angle::new(0, 0, 0.0);")]
             #[doc = concat!(" let radians: ", stringify!($type), " = angle.into();")]
-            #[doc = concat!(" assert_eq!(radians, 0.0 as ", stringify!($type), "); // Adjust the example as needed")]
+            #[doc = concat!(" assert_eq!(radians, 0.0 as ", stringify!($type), ");")]
             #[doc = concat!(" ```")]
             impl ::std::convert::Into<$type> for Angle {
                 fn into(self) -> $type {
@@ -258,6 +264,17 @@ impl<T> AxisElement<T> {
 /// # Returns
 /// 
 /// * [AxisElement]<[Angle]>
+/// 
+/// # Example
+/// 
+/// ```
+/// use dted2::primitives::{AxisElement, Angle};
+/// 
+/// let a = AxisElement::new(Angle::new(0, 0, 59.0), Angle::new(0, 0, 0.0));
+/// let b = AxisElement::new(Angle::new(3, 1, 1.0), Angle::new(0, 2, 0.0));
+/// let c = a + b;
+/// assert_eq!(c, AxisElement::new(Angle::new(3, 2, 0.0), Angle::new(0, 2, 0.0)));
+/// ```
 impl Add for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
     fn add(self, rhs: Self) -> Self::Output {
@@ -272,6 +289,17 @@ impl Add for AxisElement<Angle> {
 /// # Returns
 /// 
 /// * [AxisElement]`<T>`
+/// 
+/// # Example
+/// 
+/// ```
+/// use dted2::primitives::{AxisElement, Angle};
+/// 
+/// let a = AxisElement::new(-10, 20);
+/// let b = 12.0;
+/// let c = a + b;
+/// assert_eq!(c, AxisElement::new(2, 32));
+/// ```
 impl<A, T> Add<A> for AxisElement<T>
 where
     A: Copy + ToPrimitive,
@@ -292,6 +320,17 @@ where
 /// # Returns
 /// 
 /// * [AxisElement]`<T>`
+/// 
+/// # Example
+/// 
+/// ```
+/// use dted2::primitives::{AxisElement, Angle};
+/// 
+/// let a = AxisElement::new(10, 20);
+/// let b = AxisElement::new(12, 32);
+/// let c = a + b;
+/// assert_eq!(c, AxisElement::new(22, 52));
+/// ```
 impl<A, T> Add<AxisElement<A>> for AxisElement<T>
 where
     A: ToPrimitive,
@@ -314,6 +353,17 @@ where
 /// # Returns
 /// 
 /// * [AxisElement]<[Angle]>
+/// 
+/// # Example
+/// 
+/// ```
+/// use dted2::primitives::{AxisElement, Angle};
+/// 
+/// let a = AxisElement::new(Angle::new(3, 1, 1.0), Angle::new(0, 2, 0.0));
+/// let b = AxisElement::new(Angle::new(0, 10, 59.0), Angle::new(0, 1, 0.0));
+/// let c = a - b;
+/// assert_eq!(c, AxisElement::new(Angle::new(2, 50, 2.0), Angle::new(0, 1, 0.0)));
+/// ```
 impl Sub for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -328,6 +378,17 @@ impl Sub for AxisElement<Angle> {
 /// # Returns
 /// 
 /// * [AxisElement]`<T>`
+/// 
+/// # Example
+/// 
+/// ```
+/// use dted2::primitives::{AxisElement, Angle};
+/// 
+/// let a = AxisElement::new(-10, 20);
+/// let b = 12.0;
+/// let c = a - b;
+/// assert_eq!(c, AxisElement::new(-22, 8));
+/// ```
 impl<S, T> Sub<S> for AxisElement<T>
 where
     S: Copy + ToPrimitive,
@@ -348,6 +409,17 @@ where
 /// # Returns
 /// 
 /// * [AxisElement]`<T>`
+/// 
+/// # Example
+/// 
+/// ```
+/// use dted2::primitives::{AxisElement, Angle};
+/// 
+/// let a = AxisElement::new(-10, 20);
+/// let b = AxisElement::new(12, 32);
+/// let c = a - b;
+/// assert_eq!(c, AxisElement::new(-22, -12));
+/// ```
 impl<S, T> Sub<AxisElement<S>> for AxisElement<T>
 where
     S: ToPrimitive,

@@ -58,9 +58,9 @@ const U16_DATA_MSK: u16 = 0x7FFF;
 /// 
 /// ```
 /// use dted2::parsers::to_uint;
-/// assert_eq!(to_uint::<u32>(b"123"), 123 as u32);
+/// assert_eq!(to_uint::<u32>(b"123"), Some(123 as u32));
 /// ```
-fn to_uint<U>(input: &[u8]) -> Option<U>
+pub fn to_uint<U>(input: &[u8]) -> Option<U>
 where
     U: PrimInt + Unsigned,
 {
@@ -88,10 +88,10 @@ where
 /// # Examples
 /// 
 /// ```
-/// use dted2::parsers::uint_char_parser;
-/// assert_eq!(uint_char_parser::<u32>(3)(b"123"), Ok((&b""[..], 123 as u32)));
+/// use dted2::parsers::uint_parser;
+/// assert_eq!(uint_parser::<u32>(3)(b"123"), Ok((&b""[..], 123 as u32)));
 /// ```
-fn uint_parser<U>(count: usize) -> impl Fn(&[u8]) -> IResult<&[u8], U> 
+pub fn uint_parser<U>(count: usize) -> impl Fn(&[u8]) -> IResult<&[u8], U> 
 where
     U: PrimInt + Unsigned
 {
@@ -118,11 +118,11 @@ where
 /// # Examples
 /// 
 /// ```
-/// use dted::uint_char_parser_with_default;
-/// assert_eq!(uint_char_parser_with_default::<u32>(3, 0)(b"123"), Ok((&b""[..], 123 as u32)));
-/// assert_eq!(uint_char_parser_with_default::<u32>(0, 0)(b"123"), Ok((&b""[..], 0 as u32)));
+/// use dted2::parsers::uint_parser_with_default;
+/// assert_eq!(uint_parser_with_default::<u32>(3, 0)(b"123"), Ok((&b""[..], 123 as u32)));
+/// assert_eq!(uint_parser_with_default::<u32>(0, 0)(b"123"), Ok((&b"123"[..], 0 as u32)));
 /// ```
-fn uint_parser_with_default<U>(count: usize, default: U) -> impl Fn(&[u8]) -> IResult<&[u8], U> 
+pub fn uint_parser_with_default<U>(count: usize, default: U) -> impl Fn(&[u8]) -> IResult<&[u8], U> 
 where
     U: PrimInt + Unsigned
 {
@@ -151,10 +151,10 @@ where
 /// ```
 /// use dted2::parsers::to_angle;
 /// use dted2::primitives::Angle;
-/// assert_eq!(to_angle(b"12345", 3, 1, 1), Ok((&b""[..], Angle { deg: 123, min: 4, sec: 5 })));
-/// assert_eq!(to_angle(b"12345W", 3, 1, 1), Ok((&b""[..], Angle { deg: -123, min: 4, sec: 5 })));
+/// assert_eq!(to_angle(b"12345", 3, 1, 1), Ok((&b""[..], Angle::new(123, 4, 5.0))));
+/// assert_eq!(to_angle(b"12345W", 3, 1, 1), Ok((&b""[..], Angle::new(-123, 4, 5.0))));
 /// ```
-fn to_angle(input: &[u8], num_deg: usize, num_min: usize, num_sec: usize) -> IResult<&[u8], Angle> {
+pub fn to_angle(input: &[u8], num_deg: usize, num_min: usize, num_sec: usize) -> IResult<&[u8], Angle> {
     let (input, (
         deg,
         min,
@@ -191,10 +191,10 @@ fn to_angle(input: &[u8], num_deg: usize, num_min: usize, num_sec: usize) -> IRe
 /// ```
 /// use dted2::primitives::Angle;
 /// use dted2::parsers::angle_parser;
-/// assert_eq!(angle_parser(3, 1, 1)(b"12345"), Ok((&b""[..], Angle { deg: 123, min: 4, sec: 5 })));
-/// assert_eq!(angle_parser(3, 1, 1)(b"12345W"), Ok((&b""[..], Angle { deg: -123, min: 4, sec: 5 })));
+/// assert_eq!(angle_parser(3, 1, 1)(b"12345"), Ok((&b""[..], Angle::new(123, 4, 5.0))));
+/// assert_eq!(angle_parser(3, 1, 1)(b"12345W"), Ok((&b""[..], Angle::new(-123, 4, 5.0))));
 /// ```
-fn angle_parser(num_deg: usize, num_min: usize, num_sec: usize) -> impl Fn(&[u8]) -> IResult<&[u8], Angle> {
+pub fn angle_parser(num_deg: usize, num_min: usize, num_sec: usize) -> impl Fn(&[u8]) -> IResult<&[u8], Angle> {
     move |input| to_angle(input, num_deg, num_min, num_sec)
 }
 
@@ -213,11 +213,11 @@ fn angle_parser(num_deg: usize, num_min: usize, num_sec: usize) -> impl Fn(&[u8]
 /// # Examples
 /// 
 /// ```
-/// use dted2::parsers::nan_parser;
-/// assert_eq!(nan_parser(b"NA$$", 4), Ok((&b""[..], None)));
-/// assert_eq!(nan_parser<u32>(b"12345", 4), Ok((&b""[..], Some(1234 as u32))));
+/// use dted2::parsers::to_nan;
+/// assert_eq!(to_nan::<u32>(b"NA$$", 4), Ok((&b""[..], None)));
+/// assert_eq!(to_nan::<u32>(b"12345", 4), Ok((&b"5"[..], Some(1234 as u32))));
 /// ```
-fn to_nan<U>(input: &[u8], count: usize) -> IResult<&[u8], Option<U>>
+pub fn to_nan<U>(input: &[u8], count: usize) -> IResult<&[u8], Option<U>>
 where
     U: PrimInt + Unsigned,
 {
@@ -256,10 +256,10 @@ where
 /// 
 /// ```
 /// use dted2::parsers::nan_parser;
-/// assert_eq!(nan_parser(4)(b"NA$$"), Ok((&b""[..], None)));
-/// assert_eq!(nan_parser<u32>(4)(b"12345"), Ok((&b""[..], Some(1234 as u32))));
+/// assert_eq!(nan_parser::<u32>(4)(b"NA$$"), Ok((&b""[..], None)));
+/// assert_eq!(nan_parser::<u32>(4)(b"12345"), Ok((&b"5"[..], Some(1234 as u32))));
 /// ```
-fn nan_parser<U>(count: usize) -> impl Fn(&[u8]) -> Result<(&[u8], Option<U>), nom::Err<nom::error::Error<&[u8]>>>
+pub fn nan_parser<U>(count: usize) -> impl Fn(&[u8]) -> Result<(&[u8], Option<U>), nom::Err<nom::error::Error<&[u8]>>>
 where
     U: PrimInt + Unsigned,
 {
@@ -294,7 +294,7 @@ where
 /// assert_eq!(to_i16(0x7fff), 32767);
 /// assert_eq!(to_i16(0xFFFF), -32767);
 /// ```
-fn to_i16(x: u16) -> i16 {
+pub fn to_i16(x: u16) -> i16 {
     let v = (x & U16_DATA_MSK) as i16;          // mask out the sign bit and get the value
     let s = ((x & U16_SIGN_BIT) >> 15) as i16;  // extract sign bit and extend to i16 directly
     (1 - (s << 1)) * v                          // branchless negation, return (1 - 2s) * v
@@ -315,13 +315,13 @@ fn to_i16(x: u16) -> i16 {
 /// 
 /// ```
 /// use dted2::parsers::signed_mag_parser;
-/// assert_eq!(signed_mag_parser(&[0x00, 0x00, ..]), Ok((&b""[..], 0)));
-/// assert_eq!(signed_mag_parser(&[0x00, 0x03, ..]), Ok((&b""[..], 3)));
-/// assert_eq!(signed_mag_parser(&[0x80, 0x03, ..]), Ok((&b""[..], -3)));
-/// assert_eq!(signed_mag_parser(&[0x7f, 0xff, ..]), Ok((&b""[..], 32767)));
-/// assert_eq!(signed_mag_parser(&[0xff, 0xff, ..]), Ok((&b""[..], -32767)));
+/// assert_eq!(signed_mag_parser(&[0x00, 0x00]), Ok((&b""[..], 0)));
+/// assert_eq!(signed_mag_parser(&[0x00, 0x03]), Ok((&b""[..], 3)));
+/// assert_eq!(signed_mag_parser(&[0x80, 0x03]), Ok((&b""[..], -3)));
+/// assert_eq!(signed_mag_parser(&[0x7f, 0xff]), Ok((&b""[..], 32767)));
+/// assert_eq!(signed_mag_parser(&[0xff, 0xff]), Ok((&b""[..], -32767)));
 /// ```
-fn signed_mag_parser(input: &[u8]) -> IResult<&[u8], i16> {
+pub fn signed_mag_parser(input: &[u8]) -> IResult<&[u8], i16> {
     map_res(
         take(2_usize),
         |bytes: &[u8]| Ok::<i16, nom::Err<nom::error::Error<&[u8]>>>(
@@ -342,21 +342,22 @@ fn signed_mag_parser(input: &[u8]) -> IResult<&[u8], i16> {
 /// 
 /// # Examples
 /// 
-/// ```
+/// ```ignore
+/// use dted2::dted::RawDTEDHeader;
+/// use dted2::primitives::{ Angle, AxisElement };
 /// use dted2::parsers::dted_uhl_parser;
-/// use dted2::dted::DTEDHeader;
-/// use dted2::dted::AxisElement;
 /// use dted2::dted::RecognitionSentinel;
 /// 
-/// assert_eq!(dted_uhl_parser(b"UHL1123456789012345W123456789012345W123456789012345W"), Ok((&b""[..], DTEDHeader {
-///     origin: AxisElement { lat: 12345, lon: 12345 },
-///     interval_s: AxisElement { lat: 12345, lon: 12345 },
-///     accuracy: 12345,
+/// // TODO: make an actual working example
+/// 
+/// assert_eq!(dted_uhl_parser(b"UHL1123456789012345W123456789012345W123456789012345W"), Ok((&b""[..], RawDTEDHeader {
+///     origin: AxisElement { lat: Angle::new(1, 1, 1.0), lon: Angle::new(1, 1, 1.0) },
+///     interval_secs_x_10: AxisElement { lat: 12345, lon: 12345 },
+///     accuracy: Some(12345),
 ///     count: AxisElement { lat: 12345, lon: 12345 },
-///     sentinel: RecognitionSentinel::UHL
 /// })));
 /// ```
-fn dted_uhl_parser(input: &[u8]) -> IResult<&[u8], RawDTEDHeader> {
+pub fn dted_uhl_parser(input: &[u8]) -> IResult<&[u8], RawDTEDHeader> {
     // --------------------------------------------------
     // verify is UHL
     // --------------------------------------------------
@@ -390,13 +391,13 @@ fn dted_uhl_parser(input: &[u8]) -> IResult<&[u8], RawDTEDHeader> {
     // --------------------------------------------------
     Ok((input, RawDTEDHeader {
         origin: AxisElement::new(lat_origin, lon_origin),
-        interval_s: AxisElement::new(lat_interval_s, lon_interval_s),
+        interval_secs_x_10: AxisElement::new(lat_interval_s, lon_interval_s),
         accuracy: accuracy,
         count: AxisElement::new(lat_count, lon_count),
     }))
 }
 
-pub fn parse_dted_file(input: &[u8]) -> IResult<&[u8], RawDTEDFile> {
+pub fn dted_file_parser(input: &[u8]) -> IResult<&[u8], RawDTEDFile> {
     // --------------------------------------------------
     // get headers and header records
     // --------------------------------------------------
@@ -458,13 +459,3 @@ pub fn parse_dted_record(input: &[u8], line_len: usize) -> IResult<&[u8], RawDTE
         elevations,
     }))
 }
-
-// pub fn read_dted_header<P: AsRef<Path>>(path: P) -> Result<DTEDHeader, Error> {
-//     let file = File::open(path)?;
-//     let mut content = Vec::new();
-//     file.take(DT2_UHL_LENGTH).read_to_end(&mut content)?;
-//     match dted_uhl_parser(&content) {
-//         Ok((_, data)) => Ok(data),
-//         Err(e) => Err(Error::from(e))
-//     }
-// }
