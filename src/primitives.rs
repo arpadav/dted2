@@ -38,6 +38,14 @@ impl Angle {
     /// # Returns
     /// 
     /// The [Angle] with the number of degrees, minutes, and seconds
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use dted2::primitives::Angle;
+    /// let angle = Angle::new(0, 1, 1.0);
+    /// assert_eq!(angle, Angle::from_secs(61.0));
+    /// ```
     pub fn new(deg: i16, min: u8, sec: f64) -> Self {
         Angle {
             deg,
