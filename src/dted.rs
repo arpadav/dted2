@@ -239,27 +239,24 @@ impl DTEDData {
     /// # Returns
     /// 
     /// * [Option<f64>]: elevation (in meters) or None if out of bounds
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use dted2::DTEDData;
+    /// let dted_data = DTEDData::read("tests/test_data.dt2").unwrap();
+    /// assert!(dted_data.get_elevation(42.52, 15.75).is_some());
+    /// assert!(dted_data.get_elevation(0.0, 0.0).is_none());
+    /// ```
     pub fn get_elevation<T: Into<f64>, U: Into<f64>>(&self, lat: T, lon: U) -> Option<f64> {
-        // --------------------------------------------------
-        // check bounds
-        // --------------------------------------------------
-        let lat: f64 = lat.into();
-        let lon: f64 = lon.into();
-        if false
-            || lat < self.min.lat
-            || lat > self.max.lat
-            || lon < self.min.lon
-            || lon > self.max.lon
-        { return None }
         // --------------------------------------------------
         // get the indices + fractions
         // --------------------------------------------------
-        let lat = (lat - self.min.lat) / self.metadata.interval.lat;
-        let lon = (lon - self.min.lon) / self.metadata.interval.lon;
-        let mut lat_int = lat as usize;
-        let mut lon_int = lon as usize;
-        let mut lat_frac = lat - lat_int as f64;
-        let mut lon_frac = lon - lon_int as f64;
+        let (lat_idx, lon_idx) = self.get_indices(lat, lon)?;
+        let mut lat_int = lat_idx as usize;
+        let mut lon_int = lon_idx as usize;
+        let mut lat_frac = lat_idx - lat_int as f64;
+        let mut lon_frac = lon_idx - lon_int as f64;
         // --------------------------------------------------
         // handle the edge case of max lat/lon
         // --------------------------------------------------
@@ -287,6 +284,42 @@ impl DTEDData {
             + elev10 * lon_frac * (1.0 - lat_frac)
             + elev11 * lon_frac * lat_frac;
         Some(result)
+    }
+
+    /// Get the indices of a lat/lon
+    /// 
+    /// # Arguments
+    /// 
+    /// * `lat` - latitude
+    /// * `lon` - longitude
+    /// 
+    /// # Returns
+    /// 
+    /// * [Option<(f64, f64)>]: (lat_index, lon_index) or None if out of bounds
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use dted2::DTEDData;
+    /// let dted_data = DTEDData::read("tests/test_data.dt2").unwrap();
+    /// assert!(dted_data.get_indices(42.52, 15.75).is_some());
+    /// assert!(dted_data.get_indices(0.0, 0.0).is_none());
+    /// ```
+    pub fn get_indices<T: Into<f64>, U: Into<f64>>(&self, lat: T, lon: U) -> Option<(f64, f64)> {
+        // --------------------------------------------------
+        // check bounds
+        // --------------------------------------------------
+        let lat: f64 = lat.into();
+        let lon: f64 = lon.into();
+        if false
+            || lat < self.min.lat
+            || lat > self.max.lat
+            || lon < self.min.lon
+            || lon > self.max.lon
+        { return None }
+        let lat_idx = (lat - self.min.lat) / self.metadata.interval.lat;
+        let lon_idx = (lon - self.min.lon) / self.metadata.interval.lon;
+        Some((lat_idx, lon_idx))
     }
 }
 
