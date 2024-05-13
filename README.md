@@ -23,7 +23,7 @@ let metadata: DTEDMetadata = data.metadata;
 let metadata: DTEDMetadata = DTEDData::read_header("dted_file.dt2").unwrap();
 
 // query elevation, returns None if out of bounds
-let elevation = data.get_elevation(50.0, 10.0).unwrap();
+let elevation: f64 = data.get_elevation(50.0, 10.0).unwrap();
 ```
 
 ## Description
