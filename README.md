@@ -7,7 +7,7 @@
 <!-- [![Coverage Status](https://coveralls.io/repos/github/arpadav/dted2/badge.svg?branch=main)](https://coveralls.io/github/arpadav/dted2?branch=main) -->
 
 <p align="center">
-    <img width="500" src="~dted.png" alt="alt text" title="optional title">
+    <img width="500" src="https://arpadvoros.com/public/dted2.png" alt="dted2 surface" title="dted2 surface">
 </p>
 
 Refactor of [`dted`](https://github.com/fizyk20/dted), with updated version of [`nom`](https://crates.io/crates/nom), improved functionality, added features, fixes, and optimizations!
@@ -20,7 +20,7 @@ use dted2::{ DTEDData, DTEDMetadata };
 let data = DTEDData::read("dted_file.dt2").unwrap();
 let metadata: DTEDMetadata = data.metadata;
 // or can read just the header without the rest of the data
-let metadata = DTEDData::read_header("dted_file.dt2").unwrap();
+let metadata: DTEDMetadata = DTEDData::read_header("dted_file.dt2").unwrap();
 
 // query elevation, returns None if out of bounds
 let elevation = data.get_elevation(50.0, 10.0).unwrap();
