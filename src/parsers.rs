@@ -407,6 +407,8 @@ pub fn dted_file_parser(input: &[u8]) -> IResult<&[u8], RawDTEDFile> {
         _acc_record,
     )) = tuple((
         dted_uhl_parser,
+        // TODO: parse DSI record
+        // TODO: parse ACC record
         take(DT2_DSI_RECORD_LENGTH),
         take(DT2_ACC_RECORD_LENGTH),
     ))(input)?;
