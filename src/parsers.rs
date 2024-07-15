@@ -221,7 +221,7 @@ pub fn to_nan<U>(input: &[u8], count: usize) -> IResult<&[u8], Option<U>>
 where
     U: PrimInt + Unsigned,
 {
-    match tag::<_, _, nom::error::Error<_>>(RecognitionSentinel::NA.as_bytes())(input) {
+    match tag::<_, _, nom::error::Error<_>>(RecognitionSentinel::NA.value())(input) {
         Ok((input, _)) => {
             let (input, _) = take(count - 2)(input)?;
             Ok((input, None))
@@ -361,7 +361,7 @@ pub fn dted_uhl_parser(input: &[u8]) -> IResult<&[u8], RawDTEDHeader> {
     // --------------------------------------------------
     // verify is UHL
     // --------------------------------------------------
-    let (input, _) = tag(RecognitionSentinel::UHL.as_bytes())(input)?;
+    let (input, _) = tag(RecognitionSentinel::UHL.value())(input)?;
     // --------------------------------------------------
     // parse header
     // --------------------------------------------------
@@ -442,7 +442,7 @@ pub fn parse_dted_record(input: &[u8], line_len: usize) -> IResult<&[u8], RawDTE
         _,
     )) = tuple((
         preceded(
-            tag(RecognitionSentinel::DATA.as_bytes()),
+            tag(RecognitionSentinel::DATA.value()),
             take(1_usize), // starting block byte size, will always be 0
         ),
         be_u16,

@@ -2,6 +2,7 @@
 // external
 // --------------------------------------------------
 use std::io::Read;
+use thisenum::Const;
 
 // --------------------------------------------------
 // local
@@ -24,6 +25,8 @@ pub const DT2_DSI_RECORD_LENGTH: usize = 648;
 /// Accuracy Description (ACC) Record Length
 pub const DT2_ACC_RECORD_LENGTH: usize = 2700;
 
+#[derive(Const)]
+#[armtype(&[u8])]
 /// DTED Recognition Sentinels
 /// Used to locate DTED data and DTED records
 /// 
@@ -43,13 +46,13 @@ pub const DT2_ACC_RECORD_LENGTH: usize = 2700;
 /// use nom::bytes::complete::tag;
 /// use dted2::dted::RecognitionSentinel;
 /// 
-/// assert_eq!(RecognitionSentinel::UHL.as_bytes(), b"UHL1");
-/// assert_eq!(RecognitionSentinel::DSI.as_bytes(), b"DSIU");
-/// assert_eq!(RecognitionSentinel::ACC.as_bytes(), b"ACC");
-/// assert_eq!(RecognitionSentinel::DATA.as_bytes(), &[0xAA]);
+/// assert_eq!(RecognitionSentinel::UHL.value(), b"UHL1");
+/// assert_eq!(RecognitionSentinel::DSI.value(), b"DSIU");
+/// assert_eq!(RecognitionSentinel::ACC.value(), b"ACC");
+/// assert_eq!(RecognitionSentinel::DATA.value(), &[0xAA]);
 /// 
 /// fn is_user_header_label(input: &[u8]) -> nom::IResult<&[u8], ()> {
-///     let (input, _) = tag(RecognitionSentinel::UHL.as_bytes())(input)?;
+///     let (input, _) = tag(RecognitionSentinel::UHL.value())(input)?;
 ///     Ok((input, ()))
 /// }
 /// 
@@ -58,22 +61,16 @@ pub const DT2_ACC_RECORD_LENGTH: usize = 2700;
 /// assert!(is_user_header_label(b"xxxUHL1xxx").is_err());
 /// ```
 pub enum RecognitionSentinel {
+    #[value = b"UHL1"]  // 85 72 76 49
     UHL,
+    #[value = b"DSIU"]  // 68 83 73 85
     DSI,
+    #[value = b"ACC"]   // 65 67 67
     ACC,
+    #[value = b"\xAA"]  // 170
     DATA,
+    #[value = b"NA"]    // 78 65
     NA,
-}
-impl RecognitionSentinel {
-    pub fn as_bytes(&self) -> &'static [u8] {
-        match self {
-            RecognitionSentinel::UHL => b"UHL1",    // 85 72 76 49    
-            RecognitionSentinel::DSI => b"DSIU",    // 68 83 73 85
-            RecognitionSentinel::ACC => b"ACC",     // 65 67 67
-            RecognitionSentinel::DATA => &[0xAA],   // 170
-            RecognitionSentinel::NA => b"NA",       // 78 65
-        }
-    }
 }
 
 #[derive(Debug)]
