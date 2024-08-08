@@ -1,4 +1,5 @@
 #![allow(unused_doc_comments)]
+//! Contains [nom] parsers for various components within a DTED file.
 
 // --------------------------------------------------
 // external

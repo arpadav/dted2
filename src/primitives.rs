@@ -1,3 +1,5 @@
+//! Contains primitive items used through the crate.
+
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::ops::{Add, Div, Mul, Sub};
 
@@ -160,14 +162,12 @@ impl Angle {
     ///
     /// # Arguments
     ///
-    /// * `sec` - The number of seconds
+    /// * `sec` - The number of seconds, which can be negative
     ///
-    /// TODO: Update
-    /// TODO: negative
     ///
     /// # Returns
     ///
-    /// The number of degrees, minutes, and seconds
+    /// The number of degrees, minutes, and seconds as an [Angle].
     ///
     /// # Panics
     ///
@@ -180,9 +180,12 @@ impl Angle {
     ///
     /// assert_eq!(Angle::from_secs(61.0), Angle::new(0, 1, 1.0, false));
     /// assert_eq!(Angle::new(123, 45, 43.8, true).total_secs(), -445543.8);
+    /// ```
     ///
-    /// // TODO: Add panic test
-    /// //Angle::from_secs(1e10);
+    /// ```should_panic
+    /// use dted2::primitives::Angle;
+    ///
+    /// Angle::from_secs(1e10);
     /// ```
     pub fn from_secs(total_sec: f64) -> Self {
         let sec_abs = total_sec.abs();
@@ -442,10 +445,9 @@ where
                     panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
                 }),
             lon: self.lon
-                + T::from_f64(rhs).expect(&format!(
-                    "Failed to convert f64 to {}",
-                    std::any::type_name::<T>()
-                )),
+                + T::from_f64(rhs).unwrap_or_else(|| {
+                    panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
+                }),
         }
     }
 }
@@ -478,14 +480,12 @@ where
         let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
         let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
         AxisElement {
-            lat: T::from_f64(lat + rhs_lat).expect(&format!(
-                "Failed to convert f64 to {}",
-                std::any::type_name::<T>()
-            )),
-            lon: T::from_f64(lon + rhs_lon).expect(&format!(
-                "Failed to convert f64 to {}",
-                std::any::type_name::<T>()
-            )),
+            lat: T::from_f64(lat + rhs_lat).unwrap_or_else(|| {
+                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
+            }),
+            lon: T::from_f64(lon + rhs_lon).unwrap_or_else(|| {
+                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
+            }),
         }
     }
 }
@@ -540,15 +540,13 @@ where
         let rhs = S::to_f64(&rhs).expect("Failed to convert RHS to f64");
         AxisElement {
             lat: self.lat
-                - T::from_f64(rhs).expect(&format!(
-                    "Failed to convert f64 to {}",
-                    std::any::type_name::<T>()
-                )),
+                - T::from_f64(rhs).unwrap_or_else(|| {
+                    panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
+                }),
             lon: self.lon
-                - T::from_f64(rhs).expect(&format!(
-                    "Failed to convert f64 to {}",
-                    std::any::type_name::<T>()
-                )),
+                - T::from_f64(rhs).unwrap_or_else(|| {
+                    panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
+                }),
         }
     }
 }
@@ -581,14 +579,12 @@ where
         let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
         let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
         AxisElement {
-            lat: T::from_f64(lat - rhs_lat).expect(&format!(
-                "Failed to convert f64 to {}",
-                std::any::type_name::<T>()
-            )),
-            lon: T::from_f64(lon - rhs_lon).expect(&format!(
-                "Failed to convert f64 to {}",
-                std::any::type_name::<T>()
-            )),
+            lat: T::from_f64(lat - rhs_lat).unwrap_or_else(|| {
+                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
+            }),
+            lon: T::from_f64(lon - rhs_lon).unwrap_or_else(|| {
+                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
+            }),
         }
     }
 }

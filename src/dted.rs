@@ -1,3 +1,7 @@
+//! Contains the primary abstract entities parsed from a DTED file.
+//!
+//! The main entry point is [`DTEDData`].
+
 // --------------------------------------------------
 // external
 // --------------------------------------------------
