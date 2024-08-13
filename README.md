@@ -14,7 +14,7 @@ Refactor of [`dted`](https://github.com/fizyk20/dted), with updated version of [
 
 ## Usage
 
-```rust
+```rust ignore
 use dted2::{ DTEDData, DTEDMetadata };
 
 let data = DTEDData::read("dted_file.dt2").unwrap();

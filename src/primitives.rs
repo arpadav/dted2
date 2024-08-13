@@ -1,7 +1,8 @@
 //! Contains primitive items used through the crate.
 
-use num_traits::{FromPrimitive, ToPrimitive};
-use std::ops::{Add, Div, Mul, Sub};
+use thiserror::Error;
+use std::ops::{ Add, Div, Mul, Sub };
+use num_traits::{ FromPrimitive, ToPrimitive };
 
 /// Seconds -> Degrees
 pub const SEC2DEG: f64 = 3600.0;
@@ -9,6 +10,19 @@ pub const SEC2DEG: f64 = 3600.0;
 pub const SEC2MIN: f64 = 60.0;
 /// Minutes -> Degrees
 pub const MIN2DEG: f64 = 60.0;
+
+#[derive(Debug, Error)]
+/// Errors that can occur when converting an angle
+pub enum AngleError {
+    #[error("Seconds must be less than 60")]
+    SecondsUpperBoundBreached,
+    #[error("Seconds must be non-negative. To set a negative `Angle`, please set the `negative` parameter to `true`.")]
+    SecondsLowerBoundBreached,
+    #[error("Minutes must be less than 60")]
+    MinutesUpperBoundBreached,
+    #[error("{0}s is too large to be an Angle")]
+    TooLarge(f64),
+}
 
 #[derive(Debug, Copy, Clone)]
 /// An angle in degrees, minutes, and seconds
@@ -40,10 +54,10 @@ impl Angle {
     ///
     /// # Arguments
     ///
-    /// * `negative` - Whether or nor the angle is negative
     /// * `deg` - The number of degrees
     /// * `min` - The number of minutes
     /// * `sec` - The number of seconds (floating point precision), must always be non-negative
+    /// * `negative` - Whether or nor the angle is negative
     ///
     /// # Returns
     ///
@@ -80,16 +94,9 @@ impl Angle {
     /// let angle = Angle::new(45, 4, -4.0, false);
     /// ```
     pub fn new(deg: u16, min: u8, sec: f64, negative: bool) -> Self {
-        if min >= 60 {
-            panic!("the minutes must be les than 60");
-        }
-        if sec >= 60.0 {
-            panic!("the seconds must be les than 60");
-        }
-        if sec < 0.0 {
-            panic!("sec must be non-negative");
-        }
-
+        if min >= 60 { panic!("{}", AngleError::MinutesUpperBoundBreached); }
+        if sec >= 60.0 { panic!("{}", AngleError::SecondsUpperBoundBreached); }
+        if sec < 0.0 { panic!("{}", AngleError::SecondsLowerBoundBreached); }
         Angle {
             deg,
             min,
@@ -191,7 +198,7 @@ impl Angle {
         let sec_abs = total_sec.abs();
 
         if sec_abs > (u16::MAX as f64) * SEC2DEG {
-            panic!("{total_sec} is to large to be an Angle");
+            panic!("{}", AngleError::TooLarge(total_sec));
         }
 
         let sec_int = sec_abs as u32;
@@ -220,12 +227,7 @@ impl Angle {
     /// ```
     pub fn total_secs(&self) -> f64 {
         let secs_abs = (self.deg as u32 * 3600 + self.min as u32 * 60) as f64 + self.sec;
-
-        if self.negative {
-            -secs_abs
-        } else {
-            secs_abs
-        }
+        (((self.negative as i8 * -2) + 1) as f64) * secs_abs
     }
 }
 
@@ -243,7 +245,6 @@ impl Angle {
 impl PartialEq for Angle {
     fn eq(&self, other: &Self) -> bool {
         let is_zero = self.deg == 0 || self.min == 0 || self.sec == 0.0;
-
         (is_zero || self.negative == other.negative)
             && self.deg == other.deg
             && self.min == other.min
@@ -347,12 +348,7 @@ macro_rules! impl_type_from_angle {
                     let abs = value.deg as $type +
                         value.min as $type / (60.0 as $type) +
                         value.sec as $type / (3600.0 as $type);
-
-                    if value.negative {
-                        (-1 as $type) * abs
-                    } else {
-                        abs
-                    }
+                    abs * ((value.negative as i8 * -2 + 1) as $type)
                 }
             }
             #[doc = concat!(" Converts an [`AxisElement<Angle>`] to [`AxisElement<", stringify!($type), ">`].")]
@@ -367,6 +363,7 @@ macro_rules! impl_type_from_angle {
         )*
     };
 }
+impl_type_from_angle!(f32);
 impl_type_from_angle!(f64);
 impl_type_from_angle!(i16);
 impl_type_from_angle!(i32);

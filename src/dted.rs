@@ -28,6 +28,7 @@ pub const DT2_ACC_RECORD_LENGTH: usize = 2700;
 #[derive(Const)]
 #[armtype(&[u8])]
 /// DTED Recognition Sentinels
+/// 
 /// Used to locate DTED data and DTED records
 ///
 /// See: [https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf](https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf)

@@ -15,6 +15,7 @@ edition = "2021"
 
 [dependencies]
 nom = "7"
+thiserror = "1"
 thisenum = "0.1"
 num-traits = "0.2"
 
