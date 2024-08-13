@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 // --------------------------------------------------
 // external
 // --------------------------------------------------
@@ -9,14 +11,11 @@ use std::io;
 pub mod dted;
 pub mod parsers;
 pub mod primitives;
-pub use dted::{
-    DTEDData,
-    DTEDMetadata,
-};
+pub use dted::{ DTEDData, DTEDMetadata };
 
 #[derive(Debug)]
 /// DTED parsing error
-/// 
+///
 /// * Io - IO error
 /// * ParseError - parsing error
 pub enum Error {
@@ -35,6 +34,6 @@ impl From<nom::Needed> for Error {
 }
 impl From<nom::error::ErrorKind> for Error {
     fn from(err: nom::error::ErrorKind) -> Error {
-        Error::ParseError(format!("Parsing error:{:?}", err))
+        Error::ParseError(format!("Parsing error: {:?}", err))
     }
 }
