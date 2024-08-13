@@ -1,7 +1,5 @@
-//! Contains primitive items used through the crate.
-
-use num_traits::{FromPrimitive, ToPrimitive};
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{ Add, Sub, Mul, Div };
+use num_traits::{ ToPrimitive, FromPrimitive };
 
 /// Seconds -> Degrees
 pub const SEC2DEG: f64 = 3600.0;
@@ -10,286 +8,170 @@ pub const SEC2MIN: f64 = 60.0;
 /// Minutes -> Degrees
 pub const MIN2DEG: f64 = 60.0;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 /// An angle in degrees, minutes, and seconds
-///
-/// See: [https://en.wikipedia.org/wiki/Geographic_coordinate_system](https://en.wikipedia.org/wiki/Geographic_coordinate_system)
-///
-/// Both `min` and `sec` must be less than 60, and, despite being an `f64`, `sec` must always be positive.
-/// The fields are private to enforce these invariants, but can be accessed via methods.
-///
+/// 
+/// See: https://en.wikipedia.org/wiki/Geographic_coordinate_system
+/// 
 /// # Example
-///
+/// 
 /// ```
 /// use dted2::primitives::Angle;
-///
-/// let angle = Angle::new(0, 1, 0.0, false);
+/// let angle = Angle::new(0, 1, 0.0);
 /// assert_eq!(angle, Angle::from_secs(60.0));
-///
-/// let angle = Angle::new(1, 0, 0.0, true);
-/// assert_eq!(angle, Angle::from_secs(-3600.0));
 /// ```
 pub struct Angle {
-    deg: u16,
-    min: u8,
-    sec: f64,
-    negative: bool,
+    pub deg: i16,
+    pub min: u8,
+    pub sec: f64,
+    pub total_sec: f64,
 }
 impl Angle {
     /// Converts degrees, minutes, and seconds to an angle
-    ///
+    /// 
     /// # Arguments
-    ///
-    /// * `negative` - Whether or nor the angle is negative
+    /// 
     /// * `deg` - The number of degrees
     /// * `min` - The number of minutes
-    /// * `sec` - The number of seconds (floating point precision), must always be non-negative
-    ///
+    /// * `sec` - The number of seconds (floating point precision)
+    /// 
     /// # Returns
-    ///
+    /// 
     /// The [Angle] with the number of degrees, minutes, and seconds
-    ///
-    /// # Panics
-    ///
-    /// A panic will occur if either `min` or `sec` are at least 60, or if `sec` is negative.
-    ///
+    /// 
     /// # Examples
-    ///
+    /// 
     /// ```
     /// use dted2::primitives::Angle;
-    ///
-    /// let angle = Angle::new(0, 1, 1.0, false);
+    /// let angle = Angle::new(0, 1, 1.0);
     /// assert_eq!(angle, Angle::from_secs(61.0));
-    ///
-    /// let angle = Angle::new(123, 45, 43.0, true);
-    /// assert_eq!(angle, Angle::from_secs(-445543.0));
     /// ```
-    ///
-    /// ```should_panic
-    /// # use dted2::primitives::Angle;
-    /// let angle = Angle::new(45, 67, 4.0, false);
-    /// ```
-    ///
-    /// ```should_panic
-    /// # use dted2::primitives::Angle;
-    /// let angle = Angle::new(45, 4, 60.0, false);
-    /// ```
-    ///
-    /// ```should_panic
-    /// # use dted2::primitives::Angle;
-    /// let angle = Angle::new(45, 4, -4.0, false);
-    /// ```
-    pub fn new(deg: u16, min: u8, sec: f64, negative: bool) -> Self {
-        if min >= 60 {
-            panic!("the minutes must be les than 60");
-        }
-        if sec >= 60.0 {
-            panic!("the seconds must be les than 60");
-        }
-        if sec < 0.0 {
-            panic!("sec must be non-negative");
-        }
-
+    pub fn new(deg: i16, min: u8, sec: f64) -> Self {
         Angle {
             deg,
             min,
             sec,
-            negative,
+            total_sec: (deg as i32 * 3600 + min as i32 * 60) as f64 + sec,
         }
-    }
-
-    /// Returns whether or not the angle is negative.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dted2::primitives::Angle;
-    ///
-    /// assert!(!Angle::from_secs(4567.0).is_negative());
-    /// assert!(Angle::from_secs(-4567.0).is_negative());
-    /// ```
-    pub fn is_negative(&self) -> bool {
-        self.negative
-    }
-
-    /// Returns the positive integer number of degrees.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dted2::primitives::Angle;
-    ///
-    /// assert_eq!(Angle::new(123, 55, 28.2, false).deg(), 123);
-    /// assert_eq!(Angle::new(47, 4, 32.0, true).deg(), 47)
-    /// ```
-    #[inline]
-    pub fn deg(&self) -> u16 {
-        self.deg
-    }
-
-    /// Returns the positive integer number of minutes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dted2::primitives::Angle;
-    ///
-    /// assert_eq!(Angle::new(123, 55, 28.2, false).min(), 55);
-    /// assert_eq!(Angle::new(47, 4, 32.0, true).min(), 4)
-    /// ```
-    #[inline]
-    pub fn min(&self) -> u8 {
-        self.min
-    }
-
-    /// Returns the positive number of seconds.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dted2::primitives::Angle;
-    ///
-    /// assert_eq!(Angle::new(123, 55, 28.2, false).sec(), 28.2);
-    /// assert_eq!(Angle::new(47, 4, 32.0, true).sec(), 32.0)
-    /// ```
-    #[inline]
-    pub fn sec(&self) -> f64 {
-        self.sec
     }
 
     /// Converts seconds to degrees, minutes, and seconds
     /// AKA an [Angle]
-    ///
+    /// 
     /// # Arguments
-    ///
-    /// * `sec` - The number of seconds, which can be negative
-    ///
-    ///
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
     /// # Returns
-    ///
-    /// The number of degrees, minutes, and seconds as an [Angle].
-    ///
-    /// # Panics
-    ///
-    /// A panic will occur if `total_secs` is too large to be represented as an [Angle].
-    ///
+    /// 
+    /// The number of degrees, minutes, and seconds
+    /// 
     /// # Examples
-    ///
+    /// 
     /// ```
     /// use dted2::primitives::Angle;
-    ///
-    /// assert_eq!(Angle::from_secs(61.0), Angle::new(0, 1, 1.0, false));
-    /// assert_eq!(Angle::new(123, 45, 43.8, true).total_secs(), -445543.8);
-    /// ```
-    ///
-    /// ```should_panic
-    /// use dted2::primitives::Angle;
-    ///
-    /// Angle::from_secs(1e10);
+    /// let angle = Angle::from_secs(61.0);
+    /// assert_eq!(angle, Angle::new(0, 1, 1.0));
     /// ```
     pub fn from_secs(total_sec: f64) -> Self {
-        let sec_abs = total_sec.abs();
-
-        if sec_abs > (u16::MAX as f64) * SEC2DEG {
-            panic!("{total_sec} is to large to be an Angle");
-        }
-
-        let sec_int = sec_abs as u32;
-
-        let deg = sec_int / 3600;
-        let min = (sec_int % 3600) / 60;
-        let sec = sec_abs - (deg * 3600 + min * 60) as f64;
-
         Angle {
-            deg: deg as u16,
-            min: min as u8,
-            sec,
-            negative: total_sec < 0.0,
+            deg: Angle::sec2deg(&total_sec),
+            min: Angle::sec2min(&total_sec),
+            sec: Angle::sec2sec(&total_sec),
+            total_sec,
         }
     }
 
-    /// Computes the signed total arc seconds of the angle.
+    /// Converts seconds to degrees
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
+    /// # Returns
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dted2::primitives::Angle;
-    ///
-    /// assert_eq!(Angle::new(0, 1, 1.0, false).total_secs(), 61.0);
-    /// assert_eq!(Angle::new(123, 45, 43.8, true).total_secs(), -445543.8);
-    /// ```
-    pub fn total_secs(&self) -> f64 {
-        let secs_abs = (self.deg as u32 * 3600 + self.min as u32 * 60) as f64 + self.sec;
+    /// The number of degrees
+    fn sec2deg(sec: &f64) -> i16 {
+        *sec as i16 / 3600
+    }
 
-        if self.negative {
-            -secs_abs
-        } else {
-            secs_abs
-        }
+    /// Converts seconds to minutes
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
+    /// # Returns
+    ///
+    /// The number of minutes
+    fn sec2min(sec: &f64) -> u8 {
+        ((*sec as u64 % 3600) / 60) as u8
+    }
+
+    /// Converts seconds to seconds
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sec` - The number of seconds
+    /// 
+    /// # Returns
+    ///
+    /// The number of seconds
+    fn sec2sec(sec: &f64) -> f64 {
+        sec % 60.0
     }
 }
-
-/// Compares two [Angle]s, taking into account that positive zero is the same as negative zero.
-///
-/// # Examples
-/// ```
-/// use dted2::primitives::Angle;
-///
-/// assert_eq!(Angle::new(1, 1, 1.0, false), Angle::new(1, 1, 1.0, false));
-/// assert_ne!(Angle::new(1, 1, 1.0, false), Angle::new(1, 1, 1.0, true));
-/// assert_ne!(Angle::new(1, 1, 1.0, false), Angle::new(1, 1, 2.0, false));
-/// assert_eq!(Angle::new(0, 0, 0.0, false), Angle::new(0, 0, 0.0, true));
-/// ```
-impl PartialEq for Angle {
-    fn eq(&self, other: &Self) -> bool {
-        let is_zero = self.deg == 0 || self.min == 0 || self.sec == 0.0;
-
-        (is_zero || self.negative == other.negative)
-            && self.deg == other.deg
-            && self.min == other.min
-            && self.sec == other.sec
-    }
-}
-
 /// Add's an [Angle] to another [Angle]
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [Angle]
-///
 impl Add for Angle {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        Angle::from_secs(self.total_secs() + rhs.total_secs())
+        let sec = self.sec + rhs.sec;
+        let min_overflow = sec / 60.0;
+        let sec = sec % 60.0;
+        let min = self.min as u16 + rhs.min as u16 + min_overflow as u16;
+        let deg_overflow = min / 60;
+        let min = (min % 60) as u8;
+        let deg = self.deg + rhs.deg + deg_overflow as i16;
+        Angle::new(deg, min, sec)
     }
 }
-
 /// Subtracts an [Angle] from another [Angle]
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [Angle]
 impl Sub for Angle {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        Angle::from_secs(self.total_secs() - rhs.total_secs())
+        let sec_diff = self.sec - rhs.sec;
+        let sec_underflow = sec_diff.is_sign_negative() as i16;
+        let sec = (sec_diff + 60.0 * sec_underflow as f64) % 60.0;
+        let min_diff = self.min as i16 - rhs.min as i16 - sec_underflow;
+        let min_underflow = min_diff.is_negative() as i16;
+        let min = ((min_diff + 60 * min_underflow) % 60) as u8;
+        let deg = self.deg - rhs.deg - min_underflow;
+        Angle::new(deg, min, sec)
     }
 }
 /// Multiplies an [Angle] by another [Angle]
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [Angle]
 impl Mul for Angle {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        Angle::from_secs(self.total_secs() * rhs.total_secs())
+        Angle::from_secs(self.total_sec * rhs.total_sec)
     }
 }
 /// Multiplies an [Angle] by a scalar `M` (max precision of f64)
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [Angle]
 impl<T> Mul<T> for Angle
 where
@@ -297,24 +179,24 @@ where
 {
     type Output = Self;
     fn mul(self, rhs: T) -> Self::Output {
-        Angle::from_secs(self.total_secs() * T::to_f64(&rhs).unwrap_or(0.0))
+        Angle::from_secs(self.total_sec * T::to_f64(&rhs).unwrap_or(0.0))
     }
 }
 /// Divides an [Angle] by another [Angle]
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [Angle]
 impl Div for Angle {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
-        Angle::from_secs(self.total_secs() / rhs.total_secs())
+        Angle::from_secs(self.total_sec / rhs.total_sec)
     }
 }
 /// Divides an [Angle] by a scalar `M` (max precision of f64)
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [Angle]
 impl<T> Div<T> for Angle
 where
@@ -322,12 +204,11 @@ where
 {
     type Output = Self;
     fn div(self, rhs: T) -> Self::Output {
-        Angle::from_secs(self.total_secs() / T::to_f64(&rhs).unwrap_or(1.0))
+        Angle::from_secs(self.total_sec / T::to_f64(&rhs).unwrap_or(1.0))
     }
 }
-
-/// Converts an [Angle] to degrees of variable precision
-macro_rules! impl_type_from_angle {
+/// Converts an [Angle] to radians of variable precision
+macro_rules! impl_angle_into_type {
     ($($type:ty),*) => {
         $(
             #[doc = concat!(" Converts an [Angle] (degrees, minutes, seconds) to radians as ")]
@@ -337,48 +218,44 @@ macro_rules! impl_type_from_angle {
             #[doc = concat!("")]
             #[doc = concat!(" ```")]
             #[doc = concat!(" use dted2::primitives::Angle;")]
-            #[doc = concat!("")]
-            #[doc = concat!(" let angle = Angle::new(0, 0, 0.0, false);")]
+            #[doc = concat!(" let angle = Angle::new(0, 0, 0.0);")]
             #[doc = concat!(" let radians: ", stringify!($type), " = angle.into();")]
             #[doc = concat!(" assert_eq!(radians, 0.0 as ", stringify!($type), ");")]
             #[doc = concat!(" ```")]
-            impl ::std::convert::From<Angle> for $type {
-                fn from(value: Angle) -> Self {
-                    let abs = value.deg as $type +
-                        value.min as $type / (60.0 as $type) +
-                        value.sec as $type / (3600.0 as $type);
-
-                    if value.negative {
-                        (-1 as $type) * abs
-                    } else {
-                        abs
-                    }
+            impl ::std::convert::Into<$type> for Angle {
+                fn into(self) -> $type {
+                    self.deg.abs() as $type +
+                    self.deg.signum() as $type * (
+                        self.min as $type / (60.0 as $type) +
+                        self.sec as $type / (3600.0 as $type)
+                    )
                 }
             }
-            #[doc = concat!(" Converts an [`AxisElement<Angle>`] to [`AxisElement<", stringify!($type), ">`].")]
-            impl ::std::convert::From<AxisElement<Angle>> for AxisElement<$type> {
-                fn from(value: AxisElement<Angle>) -> Self {
+            #[doc = concat!(" Converts an [AxisElement<Angle>] to [AxisElement<", stringify!($type), ">].")]
+            impl ::std::convert::Into<AxisElement<$type>> for AxisElement<Angle> {
+                fn into(self) -> AxisElement<$type> {
                     AxisElement {
-                        lat: value.lat.into(),
-                        lon: value.lon.into(),
+                        lat: self.lat.into(),
+                        lon: self.lon.into(),
                     }
                 }
             }
         )*
     };
 }
-impl_type_from_angle!(f64);
-impl_type_from_angle!(i16);
-impl_type_from_angle!(i32);
-impl_type_from_angle!(i64);
-impl_type_from_angle!(i128);
-impl_type_from_angle!(isize);
+impl_angle_into_type!(f32);
+impl_angle_into_type!(f64);
+impl_angle_into_type!(i16);
+impl_angle_into_type!(i32);
+impl_angle_into_type!(i64);
+impl_angle_into_type!(i128);
+impl_angle_into_type!(isize);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 /// An Axis element
-///
+/// 
 /// # Fields
-///
+/// 
 /// * `lat`: Latitude
 /// * `lon`: Longitude
 pub struct AxisElement<T> {
@@ -391,20 +268,20 @@ impl<T> AxisElement<T> {
     }
 }
 /// Adds a [AxisElement]<[Angle]> to another [AxisElement]<[Angle]>
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
-///
+/// 
 /// # Example
-///
+/// 
 /// ```
 /// use dted2::primitives::{AxisElement, Angle};
-///
-/// let a = AxisElement::new(Angle::new(3, 2, 59.0, false), Angle::new(0, 0, 0.0, false));
-/// let b = AxisElement::new(Angle::new(0, 1, 1.0, true), Angle::new(0, 2, 0.0, true));
+/// 
+/// let a = AxisElement::new(Angle::new(0, 0, 59.0), Angle::new(0, 0, 0.0));
+/// let b = AxisElement::new(Angle::new(3, 1, 1.0), Angle::new(0, 2, 0.0));
 /// let c = a + b;
-/// assert_eq!(c, AxisElement::new(Angle::new(3, 1, 58.0, false), Angle::new(0, 2, 0.0, true)));
+/// assert_eq!(c, AxisElement::new(Angle::new(3, 2, 0.0), Angle::new(0, 2, 0.0)));
 /// ```
 impl Add for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
@@ -416,16 +293,16 @@ impl Add for AxisElement<Angle> {
     }
 }
 /// Adds a to a scalar `A` (max precision of f64) to a [AxisElement]`<T>`
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
-///
+/// 
 /// # Example
-///
+/// 
 /// ```
 /// use dted2::primitives::{AxisElement, Angle};
-///
+/// 
 /// let a = AxisElement::new(-10, 20);
 /// let b = 12.0;
 /// let c = a + b;
@@ -440,29 +317,23 @@ where
     fn add(self, rhs: A) -> Self::Output {
         let rhs = A::to_f64(&rhs).expect("Failed to convert RHS to f64");
         AxisElement {
-            lat: self.lat
-                + T::from_f64(rhs).unwrap_or_else(|| {
-                    panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-                }),
-            lon: self.lon
-                + T::from_f64(rhs).unwrap_or_else(|| {
-                    panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-                }),
+            lat: self.lat + T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: self.lon + T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
         }
     }
 }
 /// Adds a [AxisElement]`<A>` to a scalar [AxisElement]`<T>`,
 /// using max precision of f64
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
-///
+/// 
 /// # Example
-///
+/// 
 /// ```
 /// use dted2::primitives::{AxisElement, Angle};
-///
+/// 
 /// let a = AxisElement::new(10, 20);
 /// let b = AxisElement::new(12, 32);
 /// let c = a + b;
@@ -480,30 +351,26 @@ where
         let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
         let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
         AxisElement {
-            lat: T::from_f64(lat + rhs_lat).unwrap_or_else(|| {
-                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-            }),
-            lon: T::from_f64(lon + rhs_lon).unwrap_or_else(|| {
-                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-            }),
+            lat: T::from_f64(lat + rhs_lat).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: T::from_f64(lon + rhs_lon).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
         }
     }
 }
 /// Subtracts a [AxisElement]<[Angle]> from another [AxisElement]<[Angle]>
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
-///
+/// 
 /// # Example
-///
+/// 
 /// ```
 /// use dted2::primitives::{AxisElement, Angle};
-///
-/// let a = AxisElement::new(Angle::new(3, 1, 1.0, false), Angle::new(0, 2, 0.0, true));
-/// let b = AxisElement::new(Angle::new(0, 10, 58.0, true), Angle::new(0, 1, 0.0, false));
+/// 
+/// let a = AxisElement::new(Angle::new(3, 1, 1.0), Angle::new(0, 2, 0.0));
+/// let b = AxisElement::new(Angle::new(0, 10, 59.0), Angle::new(0, 1, 0.0));
 /// let c = a - b;
-/// assert_eq!(c, AxisElement::new(Angle::new(3, 11, 59.0, false), Angle::new(0, 3, 0.0, true)));
+/// assert_eq!(c, AxisElement::new(Angle::new(2, 50, 2.0), Angle::new(0, 1, 0.0)));
 /// ```
 impl Sub for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
@@ -515,16 +382,16 @@ impl Sub for AxisElement<Angle> {
     }
 }
 /// Subtracts a scalar `S` (max precision of f64) from a [AxisElement]`<T>`
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
-///
+/// 
 /// # Example
-///
+/// 
 /// ```
 /// use dted2::primitives::{AxisElement, Angle};
-///
+/// 
 /// let a = AxisElement::new(-10, 20);
 /// let b = 12.0;
 /// let c = a - b;
@@ -539,29 +406,23 @@ where
     fn sub(self, rhs: S) -> Self::Output {
         let rhs = S::to_f64(&rhs).expect("Failed to convert RHS to f64");
         AxisElement {
-            lat: self.lat
-                - T::from_f64(rhs).unwrap_or_else(|| {
-                    panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-                }),
-            lon: self.lon
-                - T::from_f64(rhs).unwrap_or_else(|| {
-                    panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-                }),
+            lat: self.lat - T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: self.lon - T::from_f64(rhs).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
         }
     }
 }
-/// Subtracts a [AxisElement]`<S>` from a [AxisElement]`<T>`,
+/// Subtracts a [AxisElement]`<S>` from a [AxisElement]`<T>`, 
 /// using max precision of f64
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
-///
+/// 
 /// # Example
-///
+/// 
 /// ```
 /// use dted2::primitives::{AxisElement, Angle};
-///
+/// 
 /// let a = AxisElement::new(-10, 20);
 /// let b = AxisElement::new(12, 32);
 /// let c = a - b;
@@ -579,19 +440,15 @@ where
         let lat: f64 = T::to_f64(&self.lat).expect("Failed to convert latitude to f64");
         let lon: f64 = T::to_f64(&self.lon).expect("Failed to convert longitude to f64");
         AxisElement {
-            lat: T::from_f64(lat - rhs_lat).unwrap_or_else(|| {
-                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-            }),
-            lon: T::from_f64(lon - rhs_lon).unwrap_or_else(|| {
-                panic!("Failed to convert f64 to {}", std::any::type_name::<T>())
-            }),
+            lat: T::from_f64(lat - rhs_lat).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
+            lon: T::from_f64(lon - rhs_lon).expect(&format!("Failed to convert f64 to {}", std::any::type_name::<T>())),
         }
     }
 }
 /// Multiplies a [AxisElement]<[Angle]> by another [AxisElement]<[Angle]>
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl Mul for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
@@ -603,9 +460,9 @@ impl Mul for AxisElement<Angle> {
     }
 }
 /// Multiplies a [AxisElement]<[Angle]> by a [Angle]
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl Mul<Angle> for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
@@ -617,9 +474,9 @@ impl Mul<Angle> for AxisElement<Angle> {
     }
 }
 /// Multiplies a [AxisElement]<[Angle]> by a scalar `M` (max precision of f64)
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl<M> Mul<M> for AxisElement<Angle>
 where
@@ -634,9 +491,9 @@ where
     }
 }
 /// Multiplies a [AxisElement]<[Angle]> by a [AxisElement]`<M>`
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl<M> Mul<AxisElement<M>> for AxisElement<Angle>
 where
@@ -651,9 +508,9 @@ where
     }
 }
 /// Multiplies a [AxisElement]`<T>` by a [AxisElement]`<M>`
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
 impl<M, T> Mul<AxisElement<M>> for AxisElement<T>
 where
@@ -673,9 +530,9 @@ where
     }
 }
 /// Multiplies a [AxisElement]`<T>` by a scalar `M` (max precision of f64)
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
 impl<M, T> Mul<M> for AxisElement<T>
 where
@@ -694,9 +551,9 @@ where
     }
 }
 /// Divides a [AxisElement]<[Angle]> by another [AxisElement]<[Angle]>
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl Div for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
@@ -708,9 +565,9 @@ impl Div for AxisElement<Angle> {
     }
 }
 /// Divides a [AxisElement]<[Angle]> by a [Angle]
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl Div<Angle> for AxisElement<Angle> {
     type Output = AxisElement<Angle>;
@@ -722,9 +579,9 @@ impl Div<Angle> for AxisElement<Angle> {
     }
 }
 /// Divides a [AxisElement]<[Angle]> by a scalar `D` (max precision of f64)
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl<D> Div<D> for AxisElement<Angle>
 where
@@ -739,9 +596,9 @@ where
     }
 }
 /// Divides a [AxisElement]<[Angle]> by a [AxisElement]`<D>`
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]<[Angle]>
 impl<D> Div<AxisElement<D>> for AxisElement<Angle>
 where
@@ -756,9 +613,9 @@ where
     }
 }
 /// Divides a [AxisElement]`<T>` by a [AxisElement]`<D>`
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
 impl<D, T> Div<AxisElement<D>> for AxisElement<T>
 where
@@ -774,13 +631,13 @@ where
         AxisElement {
             lat: D::from_f64(lat / rhs_lat).expect("Failed to convert latitude from f64"),
             lon: D::from_f64(lon / rhs_lon).expect("Failed to convert longitude from f64"),
-        }
-    }
+        }    
+    }    
 }
 /// Divides a [AxisElement]`<T>` by a scalar `D` (max precision of f64)
-///
+/// 
 /// # Returns
-///
+/// 
 /// * [AxisElement]`<T>`
 impl<D, T> Div<D> for AxisElement<T>
 where
@@ -796,23 +653,5 @@ where
             lat: D::from_f64(lat / rhs).expect("Failed to convert latitude from f64"),
             lon: D::from_f64(lon / rhs).expect("Failed to convert longitude from f64"),
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    /// Test [Angle] conversions to various primitive types
-    fn angle_conversions() {
-        let angle = Angle::new(123, 45, 43.8, true);
-
-        assert_eq!(f64::from(angle), -123.76216666666667f64);
-        assert_eq!(i16::from(angle), -123);
-        assert_eq!(i32::from(angle), -123);
-        assert_eq!(i64::from(angle), -123);
-        assert_eq!(i128::from(angle), -123);
-        assert_eq!(isize::from(angle), -123);
     }
 }

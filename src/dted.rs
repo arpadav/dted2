@@ -1,7 +1,3 @@
-//! Contains the primary abstract entities parsed from a DTED file.
-//!
-//! The main entry point is [`DTEDData`].
-
 // --------------------------------------------------
 // external
 // --------------------------------------------------
@@ -12,8 +8,12 @@ use thisenum::Const;
 // local
 // --------------------------------------------------
 use crate::parsers;
-use crate::primitives::{self, Angle, AxisElement};
 use crate::Error as DTEDError;
+use crate::primitives::{
+    self,
+    Angle,
+    AxisElement,
+};
 
 // --------------------------------------------------
 // constants
@@ -29,60 +29,63 @@ pub const DT2_ACC_RECORD_LENGTH: usize = 2700;
 #[armtype(&[u8])]
 /// DTED Recognition Sentinels
 /// Used to locate DTED data and DTED records
-///
-/// See: [https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf](https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf)
-///
+/// 
+/// See: https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf
+/// 
+/// # Branches
+/// 
+/// * [RecognitionSentinel::UHL] - User Header Label
+/// * [RecognitionSentinel::DSI] - Data Set Identification
+/// * [RecognitionSentinel::ACC] - Accuracy Description
+/// * [RecognitionSentinel::DATA] - Data Record
+/// * [RecognitionSentinel::NA] - Not Available
+/// 
 /// # Examples
-///
+/// 
 /// ```
 /// use nom::bytes::complete::tag;
 /// use dted2::dted::RecognitionSentinel;
-///
+/// 
 /// assert_eq!(RecognitionSentinel::UHL.value(), b"UHL1");
 /// assert_eq!(RecognitionSentinel::DSI.value(), b"DSIU");
 /// assert_eq!(RecognitionSentinel::ACC.value(), b"ACC");
 /// assert_eq!(RecognitionSentinel::DATA.value(), &[0xAA]);
-///
+/// 
 /// fn is_user_header_label(input: &[u8]) -> nom::IResult<&[u8], ()> {
 ///     let (input, _) = tag(RecognitionSentinel::UHL.value())(input)?;
 ///     Ok((input, ()))
 /// }
-///
+/// 
 /// assert!(is_user_header_label(b"DSI").is_err());
 /// assert!(is_user_header_label(b"UHL1").is_ok());
 /// assert!(is_user_header_label(b"xxxUHL1xxx").is_err());
 /// ```
 pub enum RecognitionSentinel {
-    /// User Header Label
-    #[value = b"UHL1"] // 85 72 76 49
+    #[value = b"UHL1"]  // 85 72 76 49
     UHL,
-    /// Data Set Identification
-    #[value = b"DSIU"] // 68 83 73 85
+    #[value = b"DSIU"]  // 68 83 73 85
     DSI,
-    /// Accuracy Description
-    #[value = b"ACC"] // 65 67 67
+    #[value = b"ACC"]   // 65 67 67
     ACC,
-    /// Data Record
-    #[value = b"\xAA"] // 170
+    #[value = b"\xAA"]  // 170
     DATA,
-    /// Not Available
-    #[value = b"NA"] // 78 65
+    #[value = b"NA"]    // 78 65
     NA,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 /// DTED User Header Label (UHL)
-///
-/// See: [https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf](https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf)
-///
+/// 
+/// See: https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf 
+/// 
 /// # Fields
-///
-/// * `origin` - latitude and longitude of the lower left corner of the grid
-/// * `interval_secs_x_10` - data interval in seconds (decimal point is implied after third integer)
-/// * `accuracy`- absolute vertical accuracy in meters (with 90%
+/// 
+/// * `origin` [AxisElement<Angle>]: latitude and longitude of the lower left corner of the grid
+/// * `interval_secs_x_10` [AxisElement<u16>]: data interval in seconds (decimal point is implied after third integer)
+/// * `accuracy` [Option<u16>] - absolute vertical accuracy in meters (with 90%
 ///   assurance that the linear errors will not exceed this value relative to
 ///   mean sea level)
-/// * `count` - number of longitude lines and latitude points
+/// * `count` [AxisElement<u16>] - number of longitude lines and latitude points
 pub struct RawDTEDHeader {
     pub origin: AxisElement<Angle>,
     pub interval_secs_x_10: AxisElement<u16>,
@@ -92,18 +95,18 @@ pub struct RawDTEDHeader {
 
 #[derive(Clone)]
 /// DTED metadata
-///
+/// 
 /// # Fields
-///
-/// * `filename` - filename
-/// * `origin` - position of the lower left corner of the grid (floating point precision)
-/// * `origin_angle` - position of the lower left corner of the grid
-/// * `interval` - interval (floating point precision)
-/// * `interval_secs` - interval (as seconds of an [Angle])
-/// * `accuracy` - absolute vertical accuracy in meters (with 90%
+/// 
+/// * `filename` [String] - filename
+/// * `origin` [AxisElement<f64>] - position of the lower left corner of the grid (floating point precision)
+/// * `origin_angle` [AxisElement<Angle>] - position of the lower left corner of the grid
+/// * `interval` [AxisElement<f64>] - interval (floating point precision)
+/// * `interval_secs` [AxisElement<f32>] - interval (as seconds of an [Angle])
+/// * `accuracy` [Option<u16>] - absolute vertical accuracy in meters (with 90%
 ///   assurance that the linear errors will not exceed this value relative to
 ///   mean sea level)
-/// * `count` - number of longitude lines and latitude points
+/// * `count` [AxisElement<u16>] - number of longitude lines and latitude points
 pub struct DTEDMetadata {
     pub filename: String,
     pub origin: AxisElement<f64>,
@@ -115,20 +118,20 @@ pub struct DTEDMetadata {
 }
 impl DTEDMetadata {
     /// Create a [DTEDMetadata] from a [RawDTEDHeader]
-    ///
+    /// 
     /// # Arguments
-    ///
+    /// 
     /// * `raw` - [RawDTEDHeader]
     /// * `fname` - filename
-    ///
+    /// 
     /// # Returns
-    ///
+    /// 
     /// * [DTEDMetadata]: DTED metadata
     pub fn from_header(raw: &RawDTEDHeader, fname: &str) -> DTEDMetadata {
         DTEDMetadata {
             filename: fname.to_string(),
             origin: raw.origin.into(),
-            origin_angle: raw.origin,
+            origin_angle: raw.origin.into(),
             interval: raw.interval_secs_x_10 / (primitives::SEC2DEG * 10.0),
             interval_secs: raw.interval_secs_x_10 / 10.0,
             accuracy: raw.accuracy,
@@ -138,12 +141,12 @@ impl DTEDMetadata {
 }
 
 /// DTED Data
-///
+/// 
 /// This is the main entry point for reading DTED files.
 /// Usage consists of either [DTEDData::read] or [DTEDData::read_header]
-///
+/// 
 /// # Fields
-///
+/// 
 /// * `metadata` - [DTEDMetadata]
 /// * `min` - minimum lat/lon
 /// * `max` - maximum lat/lon
@@ -156,17 +159,17 @@ pub struct DTEDData {
 }
 impl DTEDData {
     /// Read a DTED file
-    ///
+    /// 
     /// # Arguments
-    ///
+    /// 
     /// * `path` (str): Path to the DTED file
-    ///
+    /// 
     /// # Returns
-    ///
+    /// 
     /// * [DTEDData]: DTED data
-    ///
+    /// 
     /// # Examples
-    ///
+    /// 
     /// ```
     /// use dted2::DTEDData;
     /// assert!(DTEDData::read("tests/test_data.dt2").is_ok());
@@ -181,12 +184,12 @@ impl DTEDData {
                 let interval = metadata.interval;
                 let origin_f64: AxisElement<f64> = data.header.origin.into();
                 Ok(DTEDData {
-                    metadata,
-                    min: origin_f64,
+                    metadata: metadata,
+                    min: origin_f64.clone(),
                     max: origin_f64 + ((data.header.count - 1) * interval),
-                    data: data.data,
+                    data: data.data
                 })
-            }
+            },
             Err(e) => match e {
                 nom::Err::Incomplete(e) => Err(e.into()),
                 nom::Err::Error(e) | nom::Err::Failure(e) => Err(e.code.into()),
@@ -195,17 +198,17 @@ impl DTEDData {
     }
 
     /// Read the header from a DTED file
-    ///
+    /// 
     /// # Arguments
-    ///
+    /// 
     /// * `path` (str): Path to the DTED file
-    ///
+    /// 
     /// # Returns
-    ///
+    /// 
     /// * [DTEDMetadata]: DTED metadata
-    ///
+    /// 
     /// # Examples
-    ///
+    /// 
     /// ```
     /// use dted2::DTEDData;
     /// assert!(DTEDData::read_header("tests/test_data.dt2").is_ok());
@@ -224,18 +227,18 @@ impl DTEDData {
     }
 
     /// Get the elevation at a lat/lon
-    ///
+    /// 
     /// # Arguments
-    ///
+    /// 
     /// * `lat` - latitude
     /// * `lon` - longitude
-    ///
+    /// 
     /// # Returns
-    ///
-    /// * Elevation (in meters) or None if out of bounds
-    ///
+    /// 
+    /// * [Option<f64>]: elevation (in meters) or None if out of bounds
+    /// 
     /// # Examples
-    ///
+    /// 
     /// ```
     /// use dted2::DTEDData;
     /// let dted_data = DTEDData::read("tests/test_data.dt2").unwrap();
@@ -281,18 +284,18 @@ impl DTEDData {
     }
 
     /// Get the indices of a lat/lon
-    ///
+    /// 
     /// # Arguments
-    ///
+    /// 
     /// * `lat` - latitude
     /// * `lon` - longitude
-    ///
+    /// 
     /// # Returns
-    ///
-    /// * `(lat_index, lon_index)` or None if out of bounds
-    ///
+    /// 
+    /// * [Option<(f64, f64)>]: (lat_index, lon_index) or None if out of bounds
+    /// 
     /// # Examples
-    ///
+    /// 
     /// ```
     /// use dted2::DTEDData;
     /// let dted_data = DTEDData::read("tests/test_data.dt2").unwrap();
@@ -305,9 +308,12 @@ impl DTEDData {
         // --------------------------------------------------
         let lat: f64 = lat.into();
         let lon: f64 = lon.into();
-        if lat < self.min.lat || lat > self.max.lat || lon < self.min.lon || lon > self.max.lon {
-            return None;
-        }
+        if false
+            || lat < self.min.lat
+            || lat > self.max.lat
+            || lon < self.min.lon
+            || lon > self.max.lon
+        { return None }
         let lat_idx = (lat - self.min.lat) / self.metadata.interval.lat;
         let lon_idx = (lon - self.min.lon) / self.metadata.interval.lon;
         Some((lat_idx, lon_idx))
@@ -315,14 +321,15 @@ impl DTEDData {
 }
 
 /// TODO
-///
+/// 
 /// DTED Data Set Identification (DSI) Record
-///
-/// See: [https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf](https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf)
+/// 
+/// See: https://www.dlr.de/de/eoc/downloads/dokumente/7_sat_miss/SRTM-XSAR-DEM-DTED-1.1.pdf 
+/// 
+/// * `security_release` (Option<str>): Security Control and Release Markings
+/// * `security_handling` (Option<str>): Security Handling Description
 pub struct DTEDRecordDSI {
-    /// Security Control and Release Markings
     pub security_release: Option<String>,
-    /// Security Handling Description
     pub security_handling: Option<String>,
     pub version: String,
     pub edition: u8,
@@ -354,7 +361,9 @@ pub struct DTEDRecordDSI {
 }
 
 /// TODO
-pub struct DTEDRecordACC {}
+pub struct DTEDRecordACC {
+
+}
 
 pub struct RawDTEDFile {
     pub header: RawDTEDHeader,
